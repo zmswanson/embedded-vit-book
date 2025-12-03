@@ -3,12 +3,12 @@
 TinyFace Dataset Browser (Streamlit)
 
 Run from repo root:
-    streamlit run tinyface_dashboard.py --server.address 0.0.0.0 --server.port 8501
+    streamlit run tinyface_structured_dashboard.py --server.address 0.0.0.0 --server.port 8501
 """
 
-import os
+import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import Tuple
 
 from PIL import Image
 import streamlit as st
@@ -23,8 +23,10 @@ def get_tinyface_root() -> Path:
     repo_root = Path(__file__).resolve().parent
     path_file = repo_root / "datasets" / "tinyface_path.txt"
     if not path_file.exists():
-        st.error(f"tinyface_path.txt not found at {path_file}. "
-                 "Run datasets/download_tinyface.py first.")
+        st.error(
+            f"tinyface_path.txt not found at {path_file}. "
+            "Run datasets/download_tinyface.py first."
+        )
         st.stop()
     root = Path(path_file.read_text().strip())
     if not root.exists():
@@ -75,6 +77,18 @@ def list_dir(path: Path):
         else:
             files.append(entry)
     return dirs, files
+
+
+def strip_markdown_images(content: str) -> str:
+    """
+    Remove markdown and HTML image tags to avoid Streamlit trying to serve
+    missing media files when README.md or other text references images.
+    """
+    # Markdown-style images: ![alt](url)
+    content = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", content)
+    # HTML <img ...> tags
+    content = re.sub(r"<img\s+[^>]*>", "", content, flags=re.IGNORECASE)
+    return content
 
 
 # -------------------------
@@ -144,11 +158,12 @@ def main():
                 col = cols[i % n_cols]
                 with col:
                     img = load_image(item["full_path"])
-                    st.image(img, caption=item["rel_path"], use_container_width=True)
+                    # Grid thumbnails: stretch to column width
+                    st.image(img, caption=item["rel_path"], width="stretch")
 
     # -------- Files tab --------
     with tab_files:
-        st.subheader("Directory & File Explorer")
+        st.subheader("Directory, File & Image Explorer")
 
         # Init current directory in session_state
         if "tinyface_current_dir" not in st.session_state:
@@ -183,6 +198,13 @@ def main():
 
         dirs, files = list_dir(cur_dir)
 
+        # Split into folders / text files / image files
+        text_exts = {".txt", ".md", ".json", ".yaml", ".yml", ".cfg", ".ini"}
+        image_exts = {".jpg", ".jpeg", ".png", ".bmp"}
+
+        text_files = [f for f in files if f.suffix.lower() in text_exts]
+        image_files = [f for f in files if f.suffix.lower() in image_exts]
+
         col_dirs, col_files = st.columns(2)
 
         # --- Directories ---
@@ -195,48 +217,74 @@ def main():
                     st.session_state.tinyface_current_dir = str(d)
                     st.rerun()
 
-        # --- Files ---
-        text_exts = {".txt", ".md", ".json", ".yaml", ".yml", ".cfg", ".ini"}
-        text_files = [f for f in files if f.suffix.lower() in text_exts]
-
+        # --- Text & image file pickers ---
         with col_files:
+            # Text files
             st.markdown("**Text files**")
             if not text_files:
                 st.caption("No text/README files in this directory.")
-                selected_file = None
+                selected_text_file = None
             else:
-                options = [f.name for f in text_files]
+                text_options = [f.name for f in text_files]
                 default_idx = 0
                 # Prefer README* if present
-                for i, name in enumerate(options):
+                for i, name in enumerate(text_options):
                     if name.lower().startswith("readme"):
                         default_idx = i
                         break
 
-                selected_name = st.selectbox(
-                    "Select a file to view", options=options, index=default_idx
+                selected_text_name = st.selectbox(
+                    "Select a text file to view", options=text_options, index=default_idx
                 )
-                selected_file = next(
-                    (f for f in text_files if f.name == selected_name), None
+                selected_text_file = next(
+                    (f for f in text_files if f.name == selected_text_name), None
+                )
+
+            st.markdown("---")
+
+            # Image files
+            st.markdown("**Image files**")
+            if not image_files:
+                st.caption("No image files in this directory.")
+                selected_image_file = None
+            else:
+                image_options = [f.name for f in image_files]
+                selected_image_name = st.selectbox(
+                    "Select an image to preview", options=image_options, key="image_select"
+                )
+                selected_image_file = next(
+                    (f for f in image_files if f.name == selected_image_name), None
                 )
 
         st.markdown("---")
 
-        if selected_file is not None:
-            st.markdown(f"### 📄 {selected_file.name}")
+        # ----- Text file preview -----
+        if selected_text_file is not None:
+            st.markdown(f"### 📄 {selected_text_file.name}")
 
             try:
-                content = selected_file.read_text(encoding="utf-8", errors="ignore")
+                content = selected_text_file.read_text(encoding="utf-8", errors="ignore")
             except Exception as e:
                 st.error(f"Could not read file: {e}")
-                return
-
-            if selected_file.suffix.lower() == ".md":
-                st.markdown(content)
             else:
-                st.code(content, language="text")
+                if selected_text_file.suffix.lower() == ".md":
+                    # Strip images so Streamlit doesn't try to serve missing media
+                    content_no_imgs = strip_markdown_images(content)
+                    st.markdown(content_no_imgs)
+                else:
+                    st.code(content, language="text")
+
+        # ----- Image preview -----
+        if selected_image_file is not None:
+            st.markdown(f"### 🖼 {selected_image_file.name}")
+            try:
+                img = load_image(str(selected_image_file))
+            except Exception as e:
+                st.error(f"Could not load image: {e}")
+            else:
+                # Bigger, consistent preview (similar to grid): stretch to container
+                st.image(img, width=400)
 
 
 if __name__ == "__main__":
     main()
-
