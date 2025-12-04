@@ -14,6 +14,7 @@ from PIL import Image
 import streamlit as st
 
 
+
 # -------------------------
 # Helpers
 # -------------------------
@@ -84,10 +85,14 @@ def strip_markdown_images(content: str) -> str:
     Remove markdown and HTML image tags to avoid Streamlit trying to serve
     missing media files when README.md or other text references images.
     """
-    # Markdown-style images: ![alt](url)
-    content = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", content)
-    # HTML <img ...> tags
-    content = re.sub(r"<img\s+[^>]*>", "", content, flags=re.IGNORECASE)
+    # Remove markdown-style images ![...](...)
+    content = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", content)
+    # Remove HTML <img> tags
+    content = re.sub(r"<img[^>]*>", "", content, flags=re.IGNORECASE)
+    # Remove <figure>...</figure> blocks
+    content = re.sub(r"<figure[^>]*>.*?</figure>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    # Remove leftover empty HTML wrappers (optional)
+    content = re.sub(r"<p>\s*</p>", "", content)
     return content
 
 
