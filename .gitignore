@@ -1,1 +1,3 @@
 datasets/tinyface_path.txt
+model.onnx*
+model.plan

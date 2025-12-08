@@ -7,40 +7,40 @@ torchmetrics==1.8.0
 # -------------------------
 # Hugging Face ecosystem
 # -------------------------
-accelerate==1.12.0
-datasets==4.4.1
-evaluate==0.4.6
-huggingface-hub==0.36.0
-safetensors==0.7.0
-tokenizers==0.22.1
-transformers==4.57.3
+accelerate
+datasets
+evaluate
+huggingface-hub
+safetensors
+tokenizers
+transformers
 
 # -------------------------
 # Vision + scientific stack
 # -------------------------
-matplotlib==3.10.7
-numpy==2.2.6
-opencv-python==4.12.0.88
-pandas==2.3.3
-pillow==11.3.0
-scikit-image==0.25.2
-scikit-learn==1.7.2
-scipy==1.16.3
-timm==1.0.22
-tqdm==4.67.1
+matplotlib
+numpy
+opencv-python
+pandas
+pillow
+scikit-image
+scikit-learn
+scipy
+timm
+tqdm
 
 # -------------------------
 # Experiment tracking
 # -------------------------
-wandb==0.23.1
+wandb
 
 # -------------------------
 # Jupyter / notebook tooling
 # -------------------------
-ipykernel==7.1.0
-jupyterlab==4.5.0
+ipykernel
+jupyterlab
 
 # -------------------------
 # Dataset helpers
 # -------------------------
-gdown==5.2.0
+gdown
