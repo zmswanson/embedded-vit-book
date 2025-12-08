@@ -16,6 +16,14 @@ tokenizers
 transformers
 
 # -------------------------
+# ONNX export / runtime
+# -------------------------
+onnx==1.20.0
+onnx-ir==0.1.12
+onnxscript==0.5.6
+onnxsim==0.4.36
+
+# -------------------------
 # Vision + scientific stack
 # -------------------------
 matplotlib

@@ -2,5 +2,5 @@ name: vit-benchmark
 channels:
   - defaults
 dependencies:
-  - python=3.11
+  - python=3.10
 prefix: /home/zms/miniconda3/envs/vit-benchmark
