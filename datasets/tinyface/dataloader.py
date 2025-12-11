@@ -9,6 +9,13 @@ from torchvision import transforms
 from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from PIL import Image
 from json import load as json_load
+from enum import Enum
+
+class DatasetType(Enum):
+    TRAIN = 0
+    EVAL = 1
+    TEST = 2
+
 
 # Manual seed for reproducibility
 np.random.seed(73)
@@ -123,6 +130,10 @@ class TinyFaceDataset(Dataset):
             for img_path in self.img_paths
         ])
 
+        # Convert the subject_ids to contiguous integers
+        self.subject_ids = {sub_id: idx for idx, sub_id in enumerate(self.subject_ids)}
+        self.label_lookup = {idx: sub_id for sub_id, idx in self.subject_ids.items()}
+
         self.transform = transform
 
     def __len__(self):
@@ -154,8 +165,9 @@ class TinyFaceDataset(Dataset):
             img = torch.tensor(img, dtype=torch.float32)
 
         subject_id = os.path.basename(self.img_paths[index]).split("_")[0]
+        label = self.subject_ids[subject_id]
 
-        return img, subject_id
+        return img, label
     
     def _get_imgpath_subid(self, index):
         """
@@ -238,7 +250,7 @@ def get_train_loader(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     return train_loader
 
 
-def get_eval_loader(tinyfaces_path: str, batch_size: int = 32, img_size: int = 224):
+def get_eval_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 224):
     """
     Helper function to create a DataLoader for the TinyFace evaluation dataset,
     which is specified by the cross-validation split 9 of the TinyFace Training_Set.
@@ -341,7 +353,7 @@ if __name__ == "__main__":
     # Example usage
     tinyfaces_path = "/mnt/data/biometrics/tinyface/"
     train_loader = get_train_loader(tinyfaces_path, batch_size=32, img_size=224)
-    eval_gallery_loader, eval_probe_loader = get_eval_loader(tinyfaces_path, batch_size=32, img_size=224)
+    eval_gallery_loader, eval_probe_loader = get_eval_loaders(tinyfaces_path, batch_size=32, img_size=224)
     gallery_loader, probe_loader = get_test_loaders(tinyfaces_path, batch_size=32, img_size=224)
 
     print("Train dataset size:", len(train_loader.dataset))
@@ -370,31 +382,56 @@ if __name__ == "__main__":
 
 
     # Print some data to verify
-    for batch_idx, (images, subject_ids) in enumerate(train_loader):
-        print(f"Batch {batch_idx} - Images shape: {images.shape}, Subject IDs: {subject_ids[:5]}")
+    for batch_idx, (images, labels) in enumerate(train_loader):
+        labels = labels.numpy().tolist()
+        print(
+            f"Batch {batch_idx} - Images shape: {images.shape},"
+            f"labels: {labels[:3]}",
+            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+        )
         if batch_idx >= 2:
             break
 
     print()
 
-    for batch_idx, (images, subject_ids) in enumerate(eval_gallery_loader):
-        print(f"Eval Gallery Batch {batch_idx} - Images shape: {images.shape}, Subject IDs: {subject_ids[:5]}")
+    for batch_idx, (images, labels) in enumerate(eval_gallery_loader):
+        labels = labels.numpy().tolist()
+        print(
+            f"Batch {batch_idx} - Images shape: {images.shape},"
+            f"labels: {labels[:3]}",
+            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+        )
         if batch_idx >= 2:
             break
 
-    for batch_idx, (images, subject_ids) in enumerate(eval_probe_loader):
-        print(f"Eval Probe Batch {batch_idx} - Images shape: {images.shape}, Subject IDs: {subject_ids[:5]}")
+    for batch_idx, (images, labels) in enumerate(eval_probe_loader):
+        labels = labels.numpy().tolist()
+        print(
+            f"Batch {batch_idx} - Images shape: {images.shape},"
+            f"labels: {labels[:3]}",
+            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+        )
         if batch_idx >= 2:
             break
         
     print()
 
-    for batch_idx, (images, subject_ids) in enumerate(gallery_loader):
-        print(f"Test Gallery Batch {batch_idx} - Images shape: {images.shape}, Subject IDs: {subject_ids[:5]}")
+    for batch_idx, (images, labels) in enumerate(gallery_loader):
+        labels = labels.numpy().tolist()
+        print(
+            f"Batch {batch_idx} - Images shape: {images.shape},"
+            f"labels: {labels[:3]}",
+            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+        )
         if batch_idx >= 2:
             break
 
-    for batch_idx, (images, subject_ids) in enumerate(probe_loader):
-        print(f"Test Probe Batch {batch_idx} - Images shape: {images.shape}, Subject IDs: {subject_ids[:5]}")
+    for batch_idx, (images, labels) in enumerate(probe_loader):
+        labels = labels.numpy().tolist()
+        print(
+            f"Batch {batch_idx} - Images shape: {images.shape},"
+            f"labels: {labels[:3]}",
+            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+        )
         if batch_idx >= 2:
             break
