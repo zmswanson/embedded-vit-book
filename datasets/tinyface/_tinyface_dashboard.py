@@ -22,7 +22,7 @@ import streamlit as st
 def get_tinyface_root() -> Path:
     """Read datasets/tinyface_path.txt to get the TinyFace root directory."""
     repo_root = Path(__file__).resolve().parent
-    path_file = repo_root / "datasets" / "tinyface_path.txt"
+    path_file = repo_root / "tinyface_path.txt"
     if not path_file.exists():
         st.error(
             f"tinyface_path.txt not found at {path_file}. "
