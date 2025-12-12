@@ -16,6 +16,35 @@ class DatasetType(Enum):
     EVAL = 1
     TEST = 2
 
+def get_tinyface_path():
+    """
+    Helper function to read the tinyface_path.txt file and return the path
+    to the TinyFace dataset.
+
+    :return: Path to the TinyFace dataset.
+    :rtype: str
+    """
+    ds_dir = os.path.dirname(__file__)
+    path_file = os.path.join(ds_dir, "tinyface_path.txt")
+
+    if not os.path.exists(path_file):
+        raise FileNotFoundError(
+            f"Please see README for instructions on creating tinyface path file. "
+            f"Or please create a file named 'tinyface_path.txt' in the directory "
+            f"{ds_dir} containing the path to the TinyFace dataset."
+        )
+
+    with open(path_file, "r") as f:
+        tinyface_data_path = f.readline().strip()
+
+        if not os.path.exists(tinyface_data_path):
+            raise FileNotFoundError(
+                f"The path to TinyFace dataset provided in tinyface_path.txt does not exist: "
+                f"{tinyface_data_path}"
+            )
+    
+    return tinyface_data_path
+
 
 # Manual seed for reproducibility
 np.random.seed(73)
@@ -130,7 +159,9 @@ class TinyFaceDataset(Dataset):
             for img_path in self.img_paths
         ])
 
-        # Convert the subject_ids to contiguous integers
+        # Sort the subject IDs to ensure consistent label assignment
+        self.subject_ids = sorted(list(self.subject_ids))
+
         self.subject_ids = {sub_id: idx for idx, sub_id in enumerate(self.subject_ids)}
         self.label_lookup = {idx: sub_id for sub_id, idx in self.subject_ids.items()}
 
@@ -351,7 +382,7 @@ def get_test_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
 
 if __name__ == "__main__":
     # Example usage
-    tinyfaces_path = "/mnt/data/biometrics/tinyface/"
+    tinyfaces_path = get_tinyface_path()
     train_loader = get_train_loader(tinyfaces_path, batch_size=32, img_size=224)
     eval_gallery_loader, eval_probe_loader = get_eval_loaders(tinyfaces_path, batch_size=32, img_size=224)
     gallery_loader, probe_loader = get_test_loaders(tinyfaces_path, batch_size=32, img_size=224)

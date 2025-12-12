@@ -34,4 +34,5 @@ def find_mismatches(tinyface_path):
     print(f"Total subjects: {num_subjects}")
 
 if __name__ == "__main__":
-    find_mismatches("/mnt/data/biometrics/tinyface/")
+    from .dataloader import get_tinyface_path
+    find_mismatches(get_tinyface_path())

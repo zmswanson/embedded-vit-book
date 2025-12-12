@@ -13,29 +13,13 @@ from typing import Tuple
 from PIL import Image
 import streamlit as st
 
+from .dataloader import get_tinyface_path
+
 
 
 # -------------------------
 # Helpers
 # -------------------------
-
-def get_tinyface_root() -> Path:
-    """Read datasets/tinyface_path.txt to get the TinyFace root directory."""
-    repo_root = Path(__file__).resolve().parent
-    path_file = repo_root / "tinyface_path.txt"
-    if not path_file.exists():
-        st.error(
-            f"tinyface_path.txt not found at {path_file}. "
-            "Run datasets/download_tinyface.py first."
-        )
-        st.stop()
-    root = Path(path_file.read_text().strip())
-    if not root.exists():
-        st.error(f"TinyFace root path from tinyface_path.txt does not exist:\n{root}")
-        st.stop()
-    return root
-
-
 @st.cache_data(show_spinner=True)
 def build_image_index(root: Path,
                       exts: Tuple[str, ...] = (".jpg", ".jpeg", ".png", ".bmp")):
@@ -105,7 +89,7 @@ def main():
     st.title("TinyFace Dataset Browser")
 
     # Locate dataset root
-    tinyface_root = get_tinyface_root()
+    tinyface_root = Path(get_tinyface_path())
     st.caption(f"TinyFace root: `{tinyface_root}`")
 
     # Tabs: Images | Files
