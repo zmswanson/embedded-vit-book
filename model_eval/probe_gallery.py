@@ -1,8 +1,9 @@
-from operator import mod
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from enum import Enum
+from sklearn.metrics import roc_curve, average_precision_score, roc_auc_score
+import numpy as np
 
 class MultiLabelMethod(Enum):
     ALL = "all" # Use all the gallery labels for matching
@@ -30,33 +31,60 @@ def get_batch_features(model, data_loader):
     return torch.cat(features, dim=0), torch.cat(labels, dim=0)
 
 
-def get_cosine_similarity(probe_features, gallery_features, device='cuda'):
+def get_cosine_similarity(
+    probe_features, gallery_features, probe_batch_size=256, device='cuda'
+):
     """
     Compute cosine similarity between probe and gallery features. Returns a tensor
-    of shape (num_probe_samples, num_gallery_samples) where each element is the cosine
-    similarity between the i-th probe feature and the j-th gallery feature.
+    of shape (num_probe_samples, num_gallery_samples) where each element is the
+    cosine similarity between the i-th probe feature and the j-th gallery feature.
     
-    :param probe_features: Description
-    :param gallery_features: Description
-    :param device: Description
+    :param probe_features: Features for the probe samples of shape
+        (num_probe_samples, feature_dim)
+    :type probe_features: torch.Tensor or np.ndarray
+    :param gallery_features: Features for the gallery samples of shape
+        (num_gallery_samples, feature_dim)
+    :type gallery_features: torch.Tensor or np.ndarray
+    :param probe_batch_size: Batch size for processing probe features to manage
+        memory usage (default: 256). Use -1 to process all at once.
+    :type probe_batch_size: int
+    :param device: Device to perform computations on (default: 'cuda').
+    :type device: str
+
+    :return: Cosine similarity matrix of shape (num_probe_samples, num_gallery_samples)
+    :rtype: torch.Tensor
     """
     if not isinstance(probe_features, torch.Tensor):
         probe_features = torch.tensor(probe_features)
     if not isinstance(gallery_features, torch.Tensor):
         gallery_features = torch.tensor(gallery_features)
 
-    probe_features.to(device)
-    gallery_features.to(device)
-
-    # TODO: Implement a more efficient batch computation, processing single
-    # probe features because of OOM and/or killing due to unresponsiveness.
     cos_sims = []
 
-    for feat in tqdm(probe_features, desc="Computing cosine similarities"):
-        cos_sim = F.cosine_similarity(
-            feat.unsqueeze(0), gallery_features, dim=1
+    if probe_batch_size == -1:
+        probe_batch_size = probe_features.shape[0]
+
+    gallery_features = gallery_features.to(device)
+    probe_features = probe_features.to(device)
+
+    if gallery_features.ndim == 1:
+        gallery_features = gallery_features.unsqueeze(0)
+
+    if probe_features.ndim == 1:
+        probe_features = probe_features.unsqueeze(0)
+    
+    for probe_batch in tqdm(
+        torch.split(probe_features, probe_batch_size),
+        desc="Computing cosine similarities"
+    ):
+        # Efficiently compute cosine similarity using matrix operations with
+        # broadcasting of norms and element-wise division of dot product results
+        cos_sim_batch = (probe_batch @ gallery_features.T) / (
+            torch.linalg.norm(probe_batch,ord=2, dim=1, keepdim=True) *
+            torch.linalg.norm(gallery_features, ord=2, dim=1, keepdim=True).T
         )
-        cos_sims.append(cos_sim.unsqueeze(0))
+
+        cos_sims.append(cos_sim_batch.detach().cpu())
 
     return torch.cat(cos_sims, dim=0)
 
@@ -77,18 +105,20 @@ def reduce_multi_label_similarities(
     :param multi_label_method: Method to reduce multi-label similarities
     :type multi_label_method: MultiLabelMethod
 
-    :return: Reduced cosine similarity matrix with shape
-        (num_probe_samples, num_unique_gallery_labels)
-    :rtype: torch.Tensor
+    :return: Reduced cosine similarity matrix of shape
+      (num_probe_samples, num_unique_gallery_labels) and the unique gallery labels
+    :rtype: Tuple[torch.Tensor, torch.Tensor]
+
     """
     unique_gallery_labels = torch.unique(gallery_labels)
     num_probe_samples = cosine_similarities.shape[0]
     reduced_similarities = torch.zeros((num_probe_samples, len(unique_gallery_labels)))
+
     for i, gallery_label in enumerate(unique_gallery_labels):
         mask = (gallery_labels == gallery_label)
         sims_for_label = cosine_similarities[:, mask]
         if multi_label_method == MultiLabelMethod.ALL:
-            return cosine_similarities
+            return cosine_similarities, gallery_labels
         elif multi_label_method == MultiLabelMethod.MEAN:
             reduced_similarities[:, i] = sims_for_label.mean(dim=1)
         elif multi_label_method == MultiLabelMethod.MAX:
@@ -96,7 +126,7 @@ def reduce_multi_label_similarities(
         else:
             raise ValueError(f"Invalid multi-label method: {multi_label_method}")
 
-    return reduced_similarities
+    return reduced_similarities, unique_gallery_labels
 
 
 def get_rank_k_accuracy(
@@ -125,7 +155,7 @@ def get_rank_k_accuracy(
     :rtype: List[float]
     """
     if multi_label_method != MultiLabelMethod.ALL:
-        cosine_similarities = reduce_multi_label_similarities(
+        cosine_similarities, gallery_labels = reduce_multi_label_similarities(
             cosine_similarities, gallery_labels, multi_label_method
         )
 
@@ -145,7 +175,77 @@ def get_rank_k_accuracy(
     return rank_k_accuracies
 
 
+def get_roc_metrics(
+    cosine_similarities, probe_labels, gallery_labels, return_dict=False,
+    multi_label_method=MultiLabelMethod.ALL
+):
+    """
+    Computes ROC metrics including FPR, TPR, thresholds, AUC, mAP, EER, and TPR at
+    specific FPR levels from the cosine similarity matrix and corresponding labels.
 
+    :param cosine_similarities: Matrix of cosine similarity scores with shape
+        (num_probe_samples, num_gallery_samples)
+    :type cosine_similarities: torch.Tensor
+    :param probe_labels: Labels for the probe samples
+    :type probe_labels: torch.Tensor
+    :param gallery_labels: Labels for the gallery samples
+    :type gallery_labels: torch.Tensor
+    :param return_dict: Whether to return results as a dictionary (default: False)
+    :type return_dict: bool
+    :param multi_label_method: Method to reduce multi-label similarities
+    :type multi_label_method: MultiLabelMethod
+
+    :return: If return_dict is True, returns a dictionary with ROC metrics.
+        Otherwise, returns a tuple of (fpr, tpr, thresholds, auc, mAP, eer,
+        eer_threshold, tpr_at_fpr_1pct, tpr_at_fpr_5pct).
+    :rtype: dict or tuple
+    """
+    if multi_label_method != MultiLabelMethod.ALL:
+        cosine_similarities, gallery_labels = reduce_multi_label_similarities(
+            cosine_similarities, gallery_labels, multi_label_method
+        )
+    
+    id_matches = (
+        probe_labels.unsqueeze(1) == gallery_labels.unsqueeze(0)
+    ).flatten().numpy()
+    sim_scores = cosine_similarities.flatten().numpy()
+
+    fpr, tpr, thresholds = roc_curve(id_matches, sim_scores)
+    auc = roc_auc_score(id_matches, sim_scores)
+
+    # calculate mean average precision (mAP) across all probe samples
+    avg_precs = []
+    for i in range(probe_labels.shape[0]):
+        ap = average_precision_score(
+            (gallery_labels == probe_labels[i]).numpy(),
+            cosine_similarities[i].numpy()
+        )
+        avg_precs.append(ap)
+    mAP = np.mean(avg_precs)
+
+    # calculate eer from fpr and tpr
+    fnr = 1 - tpr
+    eer_threshold = thresholds[np.nanargmin(np.absolute((fnr - fpr)))]
+    eer = fpr[np.nanargmin(np.absolute((fnr - fpr)))]
+    
+    # calculate tpr at fpr = 0.01 and fpr = 0.05
+    tpr_at_fpr_1pct= tpr[np.nanargmin(np.absolute((fpr - 0.01)))]
+    tpr_at_fpr_5pct = tpr[np.nanargmin(np.absolute((fpr - 0.05)))]
+
+    if return_dict:
+        return {
+            "fpr": fpr,
+            "tpr": tpr,
+            "thresholds": thresholds,
+            "auc": auc,
+            "mAP": mAP,
+            "eer": eer,
+            "eer_threshold": eer_threshold,
+            "tpr_at_fpr_1pct": tpr_at_fpr_1pct,
+            "tpr_at_fpr_5pct": tpr_at_fpr_5pct,
+        }
+
+    return fpr, tpr, thresholds, auc, mAP, eer, eer_threshold, tpr_at_fpr_1pct, tpr_at_fpr_5pct
 
 
 if __name__ == "__main__":
@@ -243,7 +343,7 @@ if __name__ == "__main__":
         [0.0, 0.0, 0.0, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.0, 0.0, 0.0, 0.5, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,],
     ])
 
-    reduced_sim_matrix = reduce_multi_label_similarities(
+    reduced_sim_matrix, reduced_gallery_labels = reduce_multi_label_similarities(
         cosine_sim_matrix, gallery_labels, multi_label_method=MultiLabelMethod.ALL
     )
 
@@ -254,24 +354,31 @@ if __name__ == "__main__":
     print(f"Rank-<1:5> accuracies: {[f'{acc:.2f}' for acc in rank_k_accuracies]}\n")
 
     print("\n[*] Test using mean similarity for each unique gallery label:")
-    reduced_sim_matrix = reduce_multi_label_similarities(
+    reduced_sim_matrix, reduced_gallery_labels = reduce_multi_label_similarities(
         cosine_sim_matrix, gallery_labels, multi_label_method=MultiLabelMethod.MEAN
     )
     print("Original shape:", cosine_sim_matrix.shape, "| Reduced shape:", reduced_sim_matrix.shape)
     print(reduced_sim_matrix.numpy().round(2),"\n")
 
-    rank_k_accuracies = get_rank_k_accuracy(reduced_sim_matrix, probe_labels, gallery_labels, k=5)
+    rank_k_accuracies = get_rank_k_accuracy(reduced_sim_matrix, probe_labels, reduced_gallery_labels, k=5)
     print(f"Rank-<1:5> accuracies: {[f'{acc:.2f}' for acc in rank_k_accuracies]}\n")
 
     print("\n[*] Test using max similarity for each unique gallery label:")
-    reduced_sim_matrix = reduce_multi_label_similarities(
+    reduced_sim_matrix, reduced_gallery_labels = reduce_multi_label_similarities(
         cosine_sim_matrix, gallery_labels, multi_label_method=MultiLabelMethod.MAX
     )
     print("Original shape:", cosine_sim_matrix.shape, "| Reduced shape:", reduced_sim_matrix.shape)
     print(reduced_sim_matrix.numpy().round(2),"\n")
 
-    rank_k_accuracies = get_rank_k_accuracy(reduced_sim_matrix, probe_labels, gallery_labels, k=5)
+    rank_k_accuracies = get_rank_k_accuracy(reduced_sim_matrix, probe_labels, reduced_gallery_labels, k=5)
     print(f"Rank-<1:5> accuracies: {[f'{acc:.2f}' for acc in rank_k_accuracies]}\n")
+
+    roc_metrics = get_roc_metrics(reduced_sim_matrix, probe_labels, reduced_gallery_labels, return_dict=True)
+    for key, value in roc_metrics.items():
+        if isinstance(value, float):
+            print(f"{key}: {value:.4f}")
+        else:
+            print(f"{key}: {value}")
 
     
     print("\n******* All functional tests completed ********\n")
