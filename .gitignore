@@ -2,3 +2,7 @@ datasets/tinyface_path.txt
 model.onnx*
 model.plan
 __pycache__/
+wandb/
+tinyface-timm/
+timm_models.txt
+timm_pretrained_models.txt

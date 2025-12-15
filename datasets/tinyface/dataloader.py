@@ -253,7 +253,9 @@ def find_dataset_dir(tinyfaces_path: str, dataset_name: str):
     return tinyfaces_path
     
 
-def get_train_loader(tinyfaces_path: str, batch_size: int = 32, img_size: int = 224):
+def get_train_loader(
+    tinyfaces_path: str, batch_size: int = 32, img_size: int = 224, num_workers: int = 4
+):
     """
     Helper function to create a DataLoader for the TinyFace training dataset.
     
@@ -263,6 +265,9 @@ def get_train_loader(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     :type batch_size: int
     :param img_size: Dimension of the square image to resize to.
     :type img_size: int
+    :param num_workers: Number of subprocesses to use for data loading.
+                        0 means that the data will be loaded in the main process.
+    :type num_workers: int
     
     :return: A DataLoader object for the training dataset.
     :rtype: torch.utils.data.DataLoader
@@ -275,13 +280,15 @@ def get_train_loader(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     )
 
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
     )
 
     return train_loader
 
 
-def get_eval_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 224):
+def get_eval_loaders(
+    tinyfaces_path: str, batch_size: int = 32, img_size: int = 224, num_workers: int = 4
+):
     """
     Helper function to create a DataLoader for the TinyFace evaluation dataset,
     which is specified by the cross-validation split 9 of the TinyFace Training_Set.
@@ -294,6 +301,9 @@ def get_eval_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     :type batch_size: int
     :param img_size: Dimension of the square image to resize to.
     :type img_size: int
+    :param num_workers: Number of subprocesses to use for data loading.
+                        0 means that the data will be loaded in the main process.
+    :type num_workers: int
 
     :return: Two DataLoader objects, one for the gallery and one for the probe set.
     :rtype: Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]
@@ -327,16 +337,18 @@ def get_eval_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     probe_dataset.img_paths = [probe_dataset.img_paths[i] for i in probe_list]
 
     probe_loader = DataLoader(
-        probe_dataset, batch_size=batch_size, shuffle=False, num_workers=4
+        probe_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
     gallery_loader = DataLoader(
-        gallery_dataset, batch_size=batch_size, shuffle=False, num_workers=4
+        gallery_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
 
     return gallery_loader, probe_loader
 
 
-def get_test_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 224):
+def get_test_loaders(
+    tinyfaces_path: str, batch_size: int = 32, img_size: int = 224, num_workers: int = 4
+):
     """
     Helper function to create DataLoader objects for the TinyFace test dataset.
     This function handles loading the Gallery_Match and Probe datasets from the Testing_Set.
@@ -352,6 +364,9 @@ def get_test_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     :type batch_size: int
     :param img_size: Dimension of the square image to resize to.
     :type img_size: int
+    :param num_workers: Number of subprocesses to use for data loading.
+                        0 means that the data will be loaded in the main process.
+    :type num_workers: int
 
     :return: Two DataLoader objects, one for the gallery and one for the probe set.
     :rtype: Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]
@@ -370,10 +385,10 @@ def get_test_loaders(tinyfaces_path: str, batch_size: int = 32, img_size: int = 
     )
 
     gallery_loader = DataLoader(
-        gallery_dataset, batch_size=batch_size, shuffle=False, num_workers=4
+        gallery_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
     probe_loader = DataLoader(
-        probe_dataset, batch_size=batch_size, shuffle=False, num_workers=4
+        probe_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
 
     return gallery_loader, probe_loader

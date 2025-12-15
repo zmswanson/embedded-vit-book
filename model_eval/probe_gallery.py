@@ -10,29 +10,47 @@ class MultiLabelMethod(Enum):
     MEAN = "mean" # Use the mean similarity score for each unique gallery label
     MAX = "max" # Use the max similarity score for each unique gallery label
 
-def get_batch_features(model, data_loader):
-    # Get the device from the model's parameters
-    device = next(model.parameters()).device.type
-    print(f"{__name__} Using device: {device}")
+@torch.no_grad()
+def get_batch_features(model, data_loader, device: str | torch.device = 'cuda'):
+    """
+    Extract features and labels from the data_loader using the provided model.
+    Assumes the model outputs feature vectors for input images, not classification
+    logits. Also assumes that the data_loader yields (images, labels) batches.
 
+    :param model: The model used for feature extraction.
+    :type model: torch.nn.Module
+    :param data_loader: DataLoader providing (images, labels) batches.
+    :type data_loader: torch.utils.data.DataLoader
+    :param device: Device to perform computations on (default: 'cuda').
+    :type device: str or torch.device
+
+    :return: A tuple of (features, labels) where features is a tensor of shape
+        (num_samples, feature_dim) and labels is a tensor of shape (num_samples,).
+    :rtype: Tuple[torch.Tensor, torch.Tensor]
+    """
+    if isinstance(device, str):
+        device = torch.device(device)
+
+    model = model.to(device)
     model.eval()
     features = []
     labels = []
 
-    with torch.no_grad():
-        for images, labels_batch in tqdm(data_loader, desc="Extracting features"):
-            images, labels_batch = images.to(device), labels_batch.to(device)
+    for images, labels_batch in tqdm(data_loader, desc="Extracting features"):
+        images, labels_batch = images.to(device), labels_batch.to(device)
 
-            output = model(images)
-            output = output.flatten(start_dim=1)
-            features.append(output.detach().cpu())
-            labels.append(labels_batch.detach().cpu())
+        output = model(images)
+        output = output.flatten(start_dim=1)
+        features.append(output.detach().cpu())
+        labels.append(labels_batch.detach().cpu())
             
     return torch.cat(features, dim=0), torch.cat(labels, dim=0)
 
 
+@torch.no_grad()
 def get_cosine_similarity(
-    probe_features, gallery_features, probe_batch_size=256, device='cuda'
+    probe_features, gallery_features, probe_batch_size: int = 256,
+    device: str | torch.device = 'cuda'
 ):
     """
     Compute cosine similarity between probe and gallery features. Returns a tensor
@@ -49,7 +67,7 @@ def get_cosine_similarity(
         memory usage (default: 256). Use -1 to process all at once.
     :type probe_batch_size: int
     :param device: Device to perform computations on (default: 'cuda').
-    :type device: str
+    :type device: str or torch.device
 
     :return: Cosine similarity matrix of shape (num_probe_samples, num_gallery_samples)
     :rtype: torch.Tensor
@@ -59,6 +77,9 @@ def get_cosine_similarity(
     if not isinstance(gallery_features, torch.Tensor):
         gallery_features = torch.tensor(gallery_features)
 
+    if isinstance(device, str):
+        device = torch.device(device)
+
     cos_sims = []
 
     if probe_batch_size == -1:
@@ -66,6 +87,9 @@ def get_cosine_similarity(
 
     gallery_features = gallery_features.to(device)
     probe_features = probe_features.to(device)
+
+    gallery_features = torch.nn.functional.normalize(gallery_features, p=2, dim=1)
+    probe_features = torch.nn.functional.normalize(probe_features, p=2, dim=1)
 
     if gallery_features.ndim == 1:
         gallery_features = gallery_features.unsqueeze(0)
@@ -77,14 +101,8 @@ def get_cosine_similarity(
         torch.split(probe_features, probe_batch_size),
         desc="Computing cosine similarities"
     ):
-        # Efficiently compute cosine similarity using matrix operations with
-        # broadcasting of norms and element-wise division of dot product results
-        cos_sim_batch = (probe_batch @ gallery_features.T) / (
-            torch.linalg.norm(probe_batch,ord=2, dim=1, keepdim=True) *
-            torch.linalg.norm(gallery_features, ord=2, dim=1, keepdim=True).T
-        )
-
-        cos_sims.append(cos_sim_batch.detach().cpu())
+        cos_sim_batch = probe_batch @ gallery_features.T
+        cos_sims.append(cos_sim_batch.cpu())
 
     return torch.cat(cos_sims, dim=0)
 
@@ -129,6 +147,7 @@ def reduce_multi_label_similarities(
     return reduced_similarities, unique_gallery_labels
 
 
+@torch.no_grad()
 def get_rank_k_accuracy(
         cosine_similarities, probe_labels, gallery_labels, k=10,
         multi_label_method=MultiLabelMethod.ALL
@@ -174,7 +193,7 @@ def get_rank_k_accuracy(
 
     return rank_k_accuracies
 
-
+@torch.no_grad()
 def get_roc_metrics(
     cosine_similarities, probe_labels, gallery_labels, return_dict=False,
     multi_label_method=MultiLabelMethod.ALL
@@ -251,7 +270,7 @@ def get_roc_metrics(
 if __name__ == "__main__":
     from torchvision import models
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
     # Load pre-trained model without the final classification layer
