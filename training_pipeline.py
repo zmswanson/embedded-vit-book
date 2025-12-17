@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 
 import torch
 torch.set_float32_matmul_precision("high")
@@ -37,6 +38,26 @@ def parse_args():
     p.add_argument("--weight-decay", type=float, default=0.05)
     p.add_argument("--label-smoothing", type=float, default=0.0)
 
+    # Freezing / thawing (selective layer training)
+    p.add_argument(
+        "--thawed-modules",
+        type=str,
+        default="",
+        help=(
+            "Comma-separated thaw presets, e.g. \"all_norm,all_attn,last_blocks\". "
+            "These are interpreted inside TimmIDModule (if supported)."
+        ),
+    )
+    p.add_argument("--thaw-last-n", type=int, default=0, help="Thaw final N blocks/layers (model-specific).")
+    p.add_argument("--thaw-last-stages", type=int, default=0, help="Thaw final N stages (model-specific).")
+    p.add_argument("--thaw-last-attn", type=int, default=0, help="Thaw final N attention modules (model-specific).")
+    p.add_argument("--thaw-regex", type=str, default=None, help="Advanced: thaw modules matching this regex.")
+    p.add_argument(
+        "--freeze-except-thawed",
+        action="store_true",
+        help="If set, freeze everything then apply thaw rules (recommended).",
+    )
+
     # Rank-k eval
     p.add_argument("--rank-k", type=int, default=10)
     p.add_argument("--probe-batch-size", type=int, default=256)
@@ -69,6 +90,39 @@ def parse_args():
     return p.parse_args()
 
 
+def _filtered_init_kwargs(cls, kwargs: dict) -> dict:
+    """
+    Filter kwargs to those accepted by cls.__init__ (keeps this script compatible
+    with older/newer TimmIDModule versions).
+    """
+    sig = inspect.signature(cls.__init__)
+    allowed = set(sig.parameters.keys()) - {"self"}
+    return {k: v for k, v in kwargs.items() if k in allowed}
+
+
+def build_model(args, num_classes: int) -> TimmIDModule:
+    thawed = [s.strip() for s in (args.thawed_modules or "").split(",") if s.strip()]
+
+    init_kwargs = dict(
+        model_name=args.model_name,
+        num_classes=num_classes,
+        img_size=args.img_size,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        label_smoothing=args.label_smoothing,
+
+        # Thawing controls (optional; only used if TimmIDModule supports them)
+        thawed_modules=thawed,
+        thaw_last_n=args.thaw_last_n,
+        thaw_last_stages=args.thaw_last_stages,
+        thaw_last_attn=args.thaw_last_attn,
+        thaw_regex=args.thaw_regex,
+        freeze_except_thawed=args.freeze_except_thawed,
+    )
+
+    return TimmIDModule(**_filtered_init_kwargs(TimmIDModule, init_kwargs))
+
+
 # -------------------------
 # Main
 # -------------------------
@@ -91,15 +145,8 @@ def main():
     train_loader = dm.train_dataloader()
     num_classes = len(train_loader.dataset.subject_ids)
 
-    # Model
-    model = TimmIDModule(
-        model_name=args.model_name,
-        num_classes=num_classes,
-        img_size=args.img_size,
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-        label_smoothing=args.label_smoothing,
-    )
+    # Model (supports thawing args if TimmIDModule has them; otherwise ignores them)
+    model = build_model(args, num_classes)
 
     # W&B config (everything that matters)
     wandb_config = vars(args).copy()
