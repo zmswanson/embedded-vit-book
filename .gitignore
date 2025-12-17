@@ -6,3 +6,7 @@ wandb/
 tinyface-timm/
 timm_models.txt
 timm_pretrained_models.txt
+model_info/
+timm_analysis.*
+timm_layers.py
+exp_timm_models.txt

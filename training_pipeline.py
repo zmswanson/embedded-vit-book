@@ -3,6 +3,10 @@ from __future__ import annotations
 import argparse
 
 import torch
+torch.set_float32_matmul_precision("high")
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
+
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
@@ -24,7 +28,7 @@ def parse_args():
     # Model / data
     p.add_argument("--model-name", type=str, default="swin_tiny_patch4_window7_224.ms_in1k")
     p.add_argument("--img-size", type=int, default=96)
-    p.add_argument("--batch-size", type=int, default=64)
+    p.add_argument("--batch-size", type=int, default=128)
     p.add_argument("--max-epochs", type=int, default=100)
     p.add_argument("--seed", type=int, default=73)
 
