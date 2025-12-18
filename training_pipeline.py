@@ -26,9 +26,9 @@ def parse_args():
     p = argparse.ArgumentParser("TinyFace TIMM fine-tuning")
 
     # Model / data
-    p.add_argument("--model-name", type=str, default="swin_tiny_patch4_window7_224.ms_in1k")
+    p.add_argument("--model-name", type=str, default="swin_base_patch4_window7_224.ms_in1k")
     p.add_argument("--img-size", type=int, default=96)
-    p.add_argument("--batch-size", type=int, default=128)
+    p.add_argument("--batch-size", type=int, default=512)
     p.add_argument("--max-epochs", type=int, default=100)
     p.add_argument("--seed", type=int, default=73)
 
@@ -36,6 +36,11 @@ def parse_args():
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--weight-decay", type=float, default=0.05)
     p.add_argument("--label-smoothing", type=float, default=0.0)
+
+    # Head
+    p.add_argument("--head-type", type=str, default="linear", choices=["linear", "cosface", "adaface", "arcface"])
+    p.add_argument("--head-scale", type=float, help="Scale parameter for the head (used for cosface, adaface, arcface).")
+    p.add_argument("--head-margin", type=float, help="Margin parameter for the head (used for cosface, adaface, arcface).")
 
     # Selective fine-tuning / freezing
     # Comma-separated list, e.g.:
@@ -47,7 +52,7 @@ def parse_args():
         default="",
         help=(
             "Comma-separated thaw rules. Examples: "
-            "'head,all_norm,last_blocks=2' or 'head,all_attn' or 'full'. "
+            "'all_norm,last_blocks=2' or 'no_head,all_attn' or 'full'."
             "Use 'none' to freeze everything (including head)."
         ),
     )
@@ -112,10 +117,19 @@ def main():
     train_loader = dm.train_dataloader()
     num_classes = len(train_loader.dataset.subject_ids)
 
+    if args.head_type in ["cosface", "adaface", "arcface"]:
+        if args.head_scale is None:
+            args.head_scale = 64.0
+        if args.head_margin is None:
+            args.head_margin = 0.35
+
     # Model
     model = TimmIDModule(
         model_name=args.model_name,
         num_classes=num_classes,
+        head_type=args.head_type,
+        head_scale=args.head_scale,
+        head_margin=args.head_margin,
         img_size=args.img_size,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -130,7 +144,9 @@ def main():
     wandb_config["tinyface_root"] = tinyface_root
 
     run_name = args.wandb_run_name or (
-        f"{args.model_name}-img{args.img_size}-bs{args.batch_size}-lr{args.lr}"
+        f"{args.model_name}-img{args.img_size}-bs{args.batch_size}-lr{args.lr}" +
+        f"-{args.head_type}:{args.head_scale}:{args.head_margin}" +
+        f"-thawed({args.thawed_modules})"
     )
 
     wandb_logger = WandbLogger(

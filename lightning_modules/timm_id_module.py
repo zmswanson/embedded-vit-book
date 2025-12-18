@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from .heads import LinearHead, CosFaceHead, AdaFaceHead, ArcFaceHead
 from typing import Dict, List, Optional, Tuple
 
 import torch
@@ -127,7 +128,7 @@ def _parse_thawed_modules_arg(arg: str) -> List[ThawSpec]:
 
         # underscore variant: the regex captures the likes of "last_blocks_2"
         # but returns None for the likes of "all_norm"
-        m = re.match(r"^(.*)_(\d+)$", raw.strip().lower())
+        m = re.match(r"^(?:backbone\.)?(.*)_(\d+)$", raw.strip().lower())
         if m:
             # group(0)=full, group(1)=key, group(2)=value
             out.append(ThawSpec(m.group(1), m.group(2)))
@@ -165,7 +166,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
 
     # ConvNeXt / PVTv2: stages.{s}.blocks.{b}
     if family in {"convnext", "pvt"}:
-        rx = re.compile(r"^stages\.(\d+)\.blocks\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?stages\.(\d+)\.blocks\.(\d+)$")
         for name, m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -174,7 +175,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
 
     # Swin: layers.{l}.blocks.{b}
     elif family == "swin":
-        rx = re.compile(r"^layers\.(\d+)\.blocks\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?layers\.(\d+)\.blocks\.(\d+)$")
         for name, m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -183,7 +184,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
 
     # DeiT / ViT: blocks.{i}
     elif family == "vit":
-        rx = re.compile(r"^blocks\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?blocks\.(\d+)$")
         for name, m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -192,7 +193,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
 
     # ResNet: layer{1-4}.{i}
     elif family == "resnet":
-        rx = re.compile(r"^layer([1-4])\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?layer([1-4])\.(\d+)$")
         for name, m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -203,7 +204,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
     # MobileViTv2: transformer blocks tend to look like:
     # stages.{s}.{b}.transformer.{t}
     elif family == "mobilevit":
-        rx = re.compile(r"^stages\.(\d+)\.(\d+)\.transformer\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?stages\.(\d+)\.(\d+)\.transformer\.(\d+)$")
         for name, m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -212,7 +213,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
 
         # Fallback: if no transformer blocks matched, use stages.{s}.{b}
         if not names:
-            rx2 = re.compile(r"^stages\.(\d+)\.(\d+)$")
+            rx2 = re.compile(r"^(?:backbone\.)?stages\.(\d+)\.(\d+)$")
             for name, m in model.named_modules():
                 mm = rx2.match(name)
                 if mm:
@@ -222,7 +223,7 @@ def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
     else:
         # Generic: treat any module named "blocks.N" or "layers.X.blocks.Y" as blocks if present
         for name, _m in model.named_modules():
-            if re.match(r"^blocks\.\d+$", name) or re.match(r"^layers\.\d+\.blocks\.\d+$", name):
+            if re.match(r"^(?:backbone\.)?blocks\.\d+$", name) or re.match(r"^(?:backbone\.)?layers\.\d+\.blocks\.\d+$", name):
                 names.append((tuple(int(x) for x in re.findall(r"\d+", name)), name))
 
     names.sort(key=lambda x: x[0])
@@ -236,14 +237,14 @@ def _collect_stage_modules(model: nn.Module, family: str) -> List[str]:
     names: List[Tuple[int, str]] = []
 
     if family in {"convnext", "pvt"}:
-        rx = re.compile(r"^stages\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?stages\.(\d+)$")
         for name, _m in model.named_modules():
             mm = rx.match(name)
             if mm:
                 names.append((int(mm.group(1)), name))
 
     elif family == "swin":
-        rx = re.compile(r"^layers\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?layers\.(\d+)$")
         for name, _m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -257,7 +258,7 @@ def _collect_stage_modules(model: nn.Module, family: str) -> List[str]:
 
     elif family == "mobilevit":
         # Stages are stages.0 .. stages.N
-        rx = re.compile(r"^stages\.(\d+)$")
+        rx = re.compile(r"^(?:backbone\.)?stages\.(\d+)$")
         for name, _m in model.named_modules():
             mm = rx.match(name)
             if mm:
@@ -327,6 +328,9 @@ class TimmIDModule(L.LightningModule):
         self,
         model_name: str,
         num_classes: int,
+        head_type: str = "linear",
+        head_scale: float = 64.0,
+        head_margin: float = 0.35,
         img_size: int = 96,
         lr: float = 3e-4,
         weight_decay: float = 0.05,
@@ -349,17 +353,48 @@ class TimmIDModule(L.LightningModule):
         self.verbose_thaw = verbose_thaw
 
         # timm: many models accept img_size; for ones that don't, timm ignores it
-        self.model = timm.create_model(
+        self.backbone = timm.create_model(
             model_name,
             pretrained=pretrained,
-            num_classes=num_classes,
+            num_classes=0, # we only want embedding features
             img_size=img_size,
         )
+
+        feature_dim = self.backbone.num_features
+
+        head_type = head_type.lower()
+        if head_type == "linear":
+            self.head = LinearHead(feature_dim, num_classes)
+        elif head_type == "cosface":
+            self.head = CosFaceHead(
+                feature_dim, num_classes, s=head_scale, m=head_margin
+            )
+        elif head_type == "adaface":
+            self.head = AdaFaceHead(
+                feature_dim, num_classes, s=head_scale, m=head_margin
+            )
+        elif head_type == "arcface":
+            self.head = ArcFaceHead(
+                feature_dim, num_classes, s=head_scale, m=head_margin
+            )
+        else:
+            raise ValueError(f"Unknown head_type={head_type}")
 
         self._thaw_applied = False
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
+        return self.backbone(x)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        emb = self.backbone(x)
+
+        logits = self.head(emb, y)
+        loss = F.cross_entropy(logits, y, label_smoothing=self.label_smoothing)
+        acc = (logits.argmax(dim=1) == y).float().mean()
+        self.log("train/loss", loss, prog_bar=True)
+        self.log("train/acc", acc, prog_bar=True)
+        return loss
 
     # Apply freeze/thaw once trainer is set up
     def on_fit_start(self) -> None:
@@ -372,25 +407,25 @@ class TimmIDModule(L.LightningModule):
         family = _infer_family(self.model_name)
 
         # Default: freeze everything, then selectively thaw
-        _freeze_all(self.model)
+        _freeze_all(self.backbone)
+        if self.head is not None:
+            _freeze_all(self.head)
 
         selected_module_names: List[str] = []
 
         # Always include head unless user explicitly uses "no_head"
         # (If you truly want "no head", pass thawed_modules including "no_head".)
-        include_head = True
-        for s in specs:
-            if s.key in {"no_head", "nohead"}:
-                include_head = False
-
-        if include_head:
-            selected_module_names.extend(_collect_head_modules(self.model))
+        include_head = not any(s.key in {"no_head", "nohead"} for s in specs)
+        if include_head and self.head is not None:
+            _thaw_module(self.head)   # ALWAYS train head unless explicitly disabled
+            selected_module_names.append("head")
+            selected_module_names.extend(_collect_head_modules(self.head))
 
         # Presets
-        norm_names = _collect_norm_modules(self.model)
-        attn_names = _collect_attention_modules(self.model)
-        block_names = _collect_block_modules(self.model, family)
-        stage_names = _collect_stage_modules(self.model, family)
+        norm_names = _collect_norm_modules(self)
+        attn_names = _collect_attention_modules(self)
+        block_names = _collect_block_modules(self, family)
+        stage_names = _collect_stage_modules(self, family)
 
         for spec in specs:
             k = spec.key
@@ -402,7 +437,7 @@ class TimmIDModule(L.LightningModule):
 
             if k == "all":
                 # thaw everything and stop
-                _thaw_module(self.model)
+                _thaw_module(self)
                 selected_module_names = ["<ALL>"]
                 break
 
@@ -442,7 +477,7 @@ class TimmIDModule(L.LightningModule):
                 if not v:
                     raise ValueError("regex requires a pattern (e.g., regex=^layers\\.3\\.)")
                 rx = re.compile(v)
-                for name, _m in self.model.named_modules():
+                for name, _m in self.named_modules():
                     if rx.search(name):
                         selected_module_names.append(name)
                 continue
@@ -459,13 +494,13 @@ class TimmIDModule(L.LightningModule):
         if "<ALL>" not in selected_module_names:
             selected_module_names = sorted(set(selected_module_names), key=_natural_key)
 
-            name_to_module: Dict[str, nn.Module] = dict(self.model.named_modules())
+            name_to_module: Dict[str, nn.Module] = dict(self.named_modules())
             for name in selected_module_names:
                 m = name_to_module.get(name, None)
                 if m is None:
                     # allow "fc"/"head"/etc as attributes, not necessarily in named_modules()
-                    if hasattr(self.model, name):
-                        m = getattr(self.model, name)
+                    if hasattr(self, name):
+                        m = getattr(self, name)
                     else:
                         continue
 
@@ -478,9 +513,9 @@ class TimmIDModule(L.LightningModule):
 
         # Optional: print a concise summary
         if self.verbose_thaw:
-            thawed_params = [n for n, p in self.model.named_parameters() if p.requires_grad]
+            thawed_params = [n for n, p in self.named_parameters() if p.requires_grad]
 
-            pct_thawed = 100.0 * len(thawed_params) / sum(1 for _ in self.model.parameters())
+            pct_thawed = 100.0 * len(thawed_params) / sum(1 for _ in self.parameters())
 
             if self._trainer is None:
                 # no trainer yet; use print()
@@ -505,15 +540,6 @@ class TimmIDModule(L.LightningModule):
                         self.print(f"  + {n}")
                     self.print(f"  ... (+{len(thawed_params)-60} more)")
 
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y, label_smoothing=self.label_smoothing)
-        acc = (logits.argmax(dim=1) == y).float().mean()
-        self.log("train/loss", loss, prog_bar=True)
-        self.log("train/acc", acc, prog_bar=True)
-        return loss
-
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
@@ -537,7 +563,8 @@ if __name__ == "__main__":
         lr=3e-4,
         weight_decay=0.05,
         label_smoothing=0.1,
-        thawed_modules="all_norm,last_stages=4",
+        head_type="adaface",
+        thawed_modules="all_norm,last_stages=1",
         verbose_thaw=True,
     )
 
