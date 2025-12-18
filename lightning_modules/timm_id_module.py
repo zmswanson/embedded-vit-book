@@ -24,8 +24,17 @@ _NORM_TYPES = (
 
 
 def _is_norm_module(m: nn.Module) -> bool:
+    """
+    Class-based and name-based detection of norm layers. Initially tries to use
+    known nn.Module types, then falls back to name-based heuristics.
+
+    :param m: module to check
+
+    :return: True if module is a normalization layer
+    """
     if isinstance(m, _NORM_TYPES):
         return True
+    
     # timm has some custom norms; catch common names
     cls = m.__class__.__name__.lower()
     return ("layernorm" in cls) or ("batchnorm" in cls) or (cls in {"rmsnorm", "layernorm2d"})
@@ -46,39 +55,66 @@ def _is_attention_module(name: str, m: nn.Module) -> bool:
 
 
 def _freeze_all(module: nn.Module) -> None:
+    """
+    Helper function to freeze all parameters in a module.
+
+    :param module: module to freeze
+    """
     for p in module.parameters():
         p.requires_grad = False
 
 
 def _thaw_module(module: nn.Module) -> None:
+    """
+    Helper function to thaw (unfreeze) all parameters in a module.
+
+    :param module: module to thaw
+    """
     for p in module.parameters():
         p.requires_grad = True
 
 
 def _natural_key(s: str) -> List[object]:
-    # Natural sort key for module names with digits
+    """
+    Natural sort key for module name strings with digits. Using regex to split on
+    digit and non-digit boundaries, e.g.,
+        "layer10.block2" -> ["layer", 10, ".block", 2]
+
+    :param s: input string
+    :return: list of strings and integers for natural sorting
+    """
     return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", s)]
 
 
 @dataclass(frozen=True)
 class ThawSpec:
+    """
+    Specification (key, value) for thawing rules, e.g.,
+        if user provides "last_blocks=2,all_norm", it produces:
+        key: "last_blocks", value: "2"
+        key: "all_norm", value: None
+    """
     key: str
     value: Optional[str] = None
 
 
 def _parse_thawed_modules_arg(arg: str) -> List[ThawSpec]:
     """
+    Helper function to parse thawed modules argument and produce list of ThawSpec.
     Accepts tokens like:
       head
       all_norm
       last_blocks=2
       last_blocks:2
       last_blocks_2
-      regex=^layers\.3\.
+      regex=^layers\.3\. (this example finds all modules in layer 3)
     """
     if not arg:
         return []
+    
     out: List[ThawSpec] = []
+
+    # Parse comma-separated tokens
     for raw in [t.strip() for t in arg.split(",") if t.strip()]:
         if "=" in raw:
             k, v = raw.split("=", 1)
@@ -88,8 +124,12 @@ def _parse_thawed_modules_arg(arg: str) -> List[ThawSpec]:
             k, v = raw.split(":", 1)
             out.append(ThawSpec(k.strip().lower(), v.strip()))
             continue
+
+        # underscore variant: the regex captures the likes of "last_blocks_2"
+        # but returns None for the likes of "all_norm"
         m = re.match(r"^(.*)_(\d+)$", raw.strip().lower())
         if m:
+            # group(0)=full, group(1)=key, group(2)=value
             out.append(ThawSpec(m.group(1), m.group(2)))
         else:
             out.append(ThawSpec(raw.strip().lower(), None))
@@ -428,20 +468,42 @@ class TimmIDModule(L.LightningModule):
                         m = getattr(self.model, name)
                     else:
                         continue
+
+                    if not isinstance(m, nn.Module):
+                        if self.verbose_thaw:
+                            print(f"[thaw] Warning: Attribute '{name}' is not a module; skipping.")
+                        continue
+
                 _thaw_module(m)
 
         # Optional: print a concise summary
         if self.verbose_thaw:
-            trainable = [n for n, p in self.model.named_parameters() if p.requires_grad]
-            self.print(f"[thaw] family={family} thawed_modules='{thawed_modules}'")
-            self.print(f"[thaw] trainable tensors: {len(trainable)}")
-            if len(trainable) <= 80:
-                for n in trainable:
-                    self.print(f"  + {n}")
+            thawed_params = [n for n, p in self.model.named_parameters() if p.requires_grad]
+
+            pct_thawed = 100.0 * len(thawed_params) / sum(1 for _ in self.model.parameters())
+
+            if self._trainer is None:
+                # no trainer yet; use print()
+                print(f"[thaw] family={family} thawed_modules='{thawed_modules}'")
+                print(f"[thaw] trainable tensors: {len(thawed_params)} ({pct_thawed:.2f}%)")
+                if len(thawed_params) <= 80:
+                    for n in thawed_params:
+                        print(f"  + {n}")
+                else:
+                    for n in thawed_params[:60]:
+                        print(f"  + {n}")
+                    print(f"  ... (+{len(thawed_params)-60} more)")
             else:
-                for n in trainable[:60]:
-                    self.print(f"  + {n}")
-                self.print(f"  ... (+{len(trainable)-60} more)")
+                # trainer exists; use self.print()
+                self.print(f"[thaw] family={family} thawed_modules='{thawed_modules}'")
+                self.print(f"[thaw] trainable tensors: {len(thawed_params)} ({pct_thawed:.2f}%)")
+                if len(thawed_params) <= 80:
+                    for n in thawed_params:
+                        self.print(f"  + {n}")
+                else:
+                    for n in thawed_params[:60]:
+                        self.print(f"  + {n}")
+                    self.print(f"  ... (+{len(thawed_params)-60} more)")
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -464,3 +526,21 @@ class TimmIDModule(L.LightningModule):
         opt = torch.optim.AdamW(params, lr=self.lr, weight_decay=self.weight_decay)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.trainer.max_epochs)
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
+
+
+if __name__ == "__main__":
+    # Run a quick test with the Swin-Tiny
+    model = TimmIDModule(
+        model_name="swin_tiny_patch4_window7_224",
+        num_classes=1000,
+        img_size=224,
+        lr=3e-4,
+        weight_decay=0.05,
+        label_smoothing=0.1,
+        thawed_modules="all_norm,last_stages=4",
+        verbose_thaw=True,
+    )
+
+    model.on_fit_start()
+
+
