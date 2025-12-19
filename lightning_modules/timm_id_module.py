@@ -1,6 +1,8 @@
 import re
 from dataclasses import dataclass
+from ._infer_family import _infer_family
 from .heads import LinearHead, CosFaceHead, AdaFaceHead, ArcFaceHead
+from .lora import LoRAConfig, inject_lora, mark_only_lora_trainable
 from typing import Dict, List, Optional, Tuple
 
 import torch
@@ -136,26 +138,6 @@ def _parse_thawed_modules_arg(arg: str) -> List[ThawSpec]:
             out.append(ThawSpec(raw.strip().lower(), None))
     return out
 
-
-# ----------------------------
-# Model-family block discovery
-# ----------------------------
-
-def _infer_family(model_name: str) -> str:
-    n = model_name.lower()
-    if "convnext" in n:
-        return "convnext"
-    if "swin" in n:
-        return "swin"
-    if "deit" in n or re.search(r"\bvit\b", n) or "visiontransformer" in n:
-        return "vit"
-    if "pvt" in n:
-        return "pvt"
-    if "mobilevit" in n:
-        return "mobilevit"
-    if "resnet" in n:
-        return "resnet"
-    return "generic"
 
 
 def _collect_block_modules(model: nn.Module, family: str) -> List[str]:
@@ -335,9 +317,21 @@ class TimmIDModule(L.LightningModule):
         lr: float = 3e-4,
         weight_decay: float = 0.05,
         label_smoothing: float = 0.0,
+        backbone_dropout: float = 0.0,
         pretrained: bool = True,
         thawed_modules: str = "head",
         verbose_thaw: bool = False,
+        # LoRA (optional)
+        lora_enabled: bool = False,
+        lora_r: int = 8,
+        lora_alpha: float = 16.0,
+        lora_dropout: float = 0.0,
+        lora_family: str = "auto",
+        lora_target_regex: Optional[str] = None,
+        lora_apply_qkv: bool = True,
+        lora_apply_proj: bool = True,
+        lora_train_bias: bool = False,
+
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -348,9 +342,27 @@ class TimmIDModule(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.label_smoothing = label_smoothing
+        self.backbone_dropout_p = backbone_dropout
+        self.backbone_dropout = (
+            nn.Dropout(backbone_dropout) if backbone_dropout > 0.0 else nn.Identity()
+        )
         self.pretrained = pretrained
         self.thawed_modules_arg = thawed_modules
         self.verbose_thaw = verbose_thaw
+
+        self.lora_enabled = lora_enabled
+        self.lora_train_bias = lora_train_bias
+        self.lora_cfg = LoRAConfig(
+            enabled=lora_enabled,
+            r=lora_r,
+            alpha=lora_alpha,
+            dropout=lora_dropout,
+            model_name=model_name,
+            family=lora_family,
+            target_regex=lora_target_regex,
+            apply_qkv=lora_apply_qkv,
+            apply_proj=lora_apply_proj,
+        )
 
         # timm: many models accept img_size; for ones that don't, timm ignores it
         self.backbone = timm.create_model(
@@ -359,6 +371,12 @@ class TimmIDModule(L.LightningModule):
             num_classes=0, # we only want embedding features
             img_size=img_size,
         )
+
+        # Optional: inject LoRA adapters into selected backbone Linear layers
+        self._lora_replaced: List[str] = []
+        if self.lora_cfg.enabled:
+            self._lora_replaced = inject_lora(self.backbone, self.lora_cfg)
+
 
         feature_dim = self.backbone.num_features
 
@@ -388,6 +406,7 @@ class TimmIDModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         emb = self.backbone(x)
+        emb = self.backbone_dropout(emb)
 
         logits = self.head(emb, y)
         loss = F.cross_entropy(logits, y, label_smoothing=self.label_smoothing)
@@ -410,6 +429,13 @@ class TimmIDModule(L.LightningModule):
         _freeze_all(self.backbone)
         if self.head is not None:
             _freeze_all(self.head)
+
+        # If LoRA is enabled, make ONLY LoRA params trainable in the backbone
+        # (thaw rules can still add norms/stages/etc if requested later)
+        if self.lora_cfg.enabled:
+            mark_only_lora_trainable(
+                self.backbone, train_bias=self.lora_train_bias
+            )
 
         selected_module_names: List[str] = []
 
@@ -520,6 +546,8 @@ class TimmIDModule(L.LightningModule):
             if self._trainer is None:
                 # no trainer yet; use print()
                 print(f"[thaw] family={family} thawed_modules='{thawed_modules}'")
+                if self.lora_cfg.enabled:
+                    print(f"[thaw] LoRA enabled; replaced {len(self._lora_replaced)} modules with LoRA adapters")
                 print(f"[thaw] trainable tensors: {len(thawed_params)} ({pct_thawed:.2f}%)")
                 if len(thawed_params) <= 80:
                     for n in thawed_params:
@@ -531,6 +559,8 @@ class TimmIDModule(L.LightningModule):
             else:
                 # trainer exists; use self.print()
                 self.print(f"[thaw] family={family} thawed_modules='{thawed_modules}'")
+                if self.lora_cfg.enabled:
+                    self.print(f"[thaw] LoRA enabled; replaced {len(self._lora_replaced)} modules with LoRA adapters")
                 self.print(f"[thaw] trainable tensors: {len(thawed_params)} ({pct_thawed:.2f}%)")
                 if len(thawed_params) <= 80:
                     for n in thawed_params:

@@ -36,23 +36,52 @@ def parse_args():
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--weight-decay", type=float, default=0.05)
     p.add_argument("--label-smoothing", type=float, default=0.0)
+    p.add_argument(
+        "--backbone-dropout", type=float, default=0.0, 
+        help="Dropout probability for the backbone embeddings."
+    )
 
     # Head
     p.add_argument("--head-type", type=str, default="linear", choices=["linear", "cosface", "adaface", "arcface"])
     p.add_argument("--head-scale", type=float, help="Scale parameter for the head (used for cosface, adaface, arcface).")
     p.add_argument("--head-margin", type=float, help="Margin parameter for the head (used for cosface, adaface, arcface).")
 
+    # LoRA (optional)
+    p.add_argument("--lora-enabled", action="store_true", help="Enable LoRA adapters in the backbone.")
+    p.add_argument("--lora-r", type=int, default=8)
+    p.add_argument("--lora-alpha", type=float, default=16.0)
+    p.add_argument("--lora-dropout", type=float, default=0.0)
+    p.add_argument(
+        "--lora-family",
+        type=str,
+        default="auto",
+        choices=["auto", "vit", "swin", "pvt", "mobilevit", "levit", "efficientformer", "cnn"],
+        help="Override inferred model family for LoRA target patterns.",
+    )
+    p.add_argument(
+        "--lora-target-regex",
+        type=str,
+        default=None,
+        help="Override LoRA target regex. If set, family-based defaults are ignored.",
+    )
+    p.add_argument("--lora-qkv", action="store_true", help="Apply LoRA to QKV (family-specific).")
+    p.add_argument("--lora-proj", action="store_true", help="Apply LoRA to projection (family-specific).")
+    p.add_argument(
+        "--lora-train-bias",
+        action="store_true",
+        help="Also train biases (backbone) when LoRA is enabled.",
+    )
+
+
     # Selective fine-tuning / freezing
-    # Comma-separated list, e.g.:
-    #   --thawed-modules head,all_norm,last_blocks=2,all_attn
+    # Comma-separated list, e.g.:--thawed-modules head,all_norm,last_blocks=2,all_attn
     # Valid options are defined in lightning_modules/timm_id_module.py.
     p.add_argument(
         "--thawed-modules",
         type=str,
         default="",
         help=(
-            "Comma-separated thaw rules. Examples: "
-            "'all_norm,last_blocks=2' or 'no_head,all_attn' or 'full'."
+            "Comma-separated thaw rules. Examples: 'all_norm,last_blocks=2' or 'no_head,all_attn' or 'all'."
             "Use 'none' to freeze everything (including head)."
         ),
     )
@@ -117,11 +146,18 @@ def main():
     train_loader = dm.train_dataloader()
     num_classes = len(train_loader.dataset.subject_ids)
 
+    # Adjust head params defaults
     if args.head_type in ["cosface", "adaface", "arcface"]:
         if args.head_scale is None:
             args.head_scale = 64.0
         if args.head_margin is None:
             args.head_margin = 0.35
+
+    # LoRA config
+    if args.lora_enabled and not (args.lora_qkv or args.lora_proj or args.lora_target_regex):
+        # If LoRA is enabled but no target specified, default to both
+        args.lora_qkv = True
+        args.lora_proj = True
 
     # Model
     model = TimmIDModule(
@@ -134,8 +170,20 @@ def main():
         lr=args.lr,
         weight_decay=args.weight_decay,
         label_smoothing=args.label_smoothing,
+        backbone_dropout=args.backbone_dropout,
         thawed_modules=args.thawed_modules,
         verbose_thaw=args.print_trainable_params,
+        # LoRA
+        lora_enabled=args.lora_enabled,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        lora_family=args.lora_family,
+        lora_target_regex=args.lora_target_regex,
+        lora_apply_qkv=args.lora_qkv,
+        lora_apply_proj=args.lora_proj,
+        lora_train_bias=args.lora_train_bias,
+
     )
 
     # W&B config (everything that matters)
@@ -143,10 +191,19 @@ def main():
     wandb_config["num_classes"] = num_classes
     wandb_config["tinyface_root"] = tinyface_root
 
+    head_tag = f"-{args.head_type}"
+    if args.head_type in ["cosface", "adaface", "arcface"]:
+        head_tag += f":s{args.head_scale}:m{args.head_margin}"
+
+    lora_tag = ""
+    if args.lora_enabled:
+        lora_tag = f"-lora(r{args.lora_r}-a{args.lora_alpha}-d{args.lora_dropout})" \
+                   f"{',qkv' if args.lora_qkv else ''}{',proj' if args.lora_proj else ''}" \
+                   f"{',' + str(args.lora_target_regex) if args.lora_target_regex else ''}"
+
     run_name = args.wandb_run_name or (
         f"{args.model_name}-img{args.img_size}-bs{args.batch_size}-lr{args.lr}" +
-        f"-{args.head_type}:{args.head_scale}:{args.head_margin}" +
-        f"-thawed({args.thawed_modules})"
+        f"{head_tag}{lora_tag}-thawed({args.thawed_modules})"
     )
 
     wandb_logger = WandbLogger(
