@@ -1,0 +1,69 @@
+program: training_pipeline.py
+method: bayes
+
+metric:
+  # name: tinyface/eval/rank@1 # match eval_on <EVAL/TEST> below
+  name: tinyface/test/rank@1
+  goal: maximize
+
+parameters:
+  # ---- Fixed ----
+  model_name:
+    value: swin_base_patch4_window7_224.ms_in1k
+  img_size:
+    value: 96
+  max_epochs:
+    value: 50
+  seed:
+    value: 73
+
+  # Linear head only
+  head_type:
+    value: linear
+  head_scale:
+    value: 64.0   # ignored by linear, but harmless
+  head_margin:
+    value: 0.35   # ignored by linear, but harmless
+
+  # Freeze/thaw
+  thawed_modules:
+    value: "last_stages=2"
+
+  # Eval setup (sweep on EVAL, not TEST)
+  eval_on:
+    value: "TEST"
+  rank_k:
+    value: 5
+
+  # Runtime
+  precision:
+    value: "16-mixed"
+  devices:
+    value: 1
+  log_every_n_steps:
+    value: 25
+
+  # ---- Search space ----
+  batch_size:
+    values: [8, 16, 32, 64, 128, 256]
+
+  lr:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 3.0e-3
+
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 3.0e-1
+
+  backbone_dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.3
+
+command:
+  - python
+  - ${program}
+  - ${args}
+  - --no_wandb_model

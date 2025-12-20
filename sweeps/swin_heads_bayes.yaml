@@ -1,0 +1,56 @@
+program: training_pipeline.py
+method: bayes
+metric:
+  # name: tinyface/eval/rank@1
+  name: tinyface/test/rank@1
+  goal: maximize
+
+parameters:
+  # ---- Fixed ----
+  model_name:
+    value: swin_base_patch4_window7_224.ms_in1k
+  img_size:
+    value: 96
+  batch_size:
+    value: 256
+  max_epochs:
+    value: 40
+  lr:
+    value: 3.0e-4
+  weight_decay:
+    value: 0.05
+  label_smoothing:
+    value: 0.0
+  backbone_dropout:
+    value: 0.0
+  thawed_modules:
+    value: "last_stages=2"
+  eval_on:
+    value: "TEST"
+  rank_k:
+    value: 5
+  precision:
+    value: "16-mixed"
+  devices:
+    value: 1
+
+  # ---- Search space ----
+  head_type:
+    values: ["cosface", "arcface", "adaface"]   # (drop linear from bayes; it doesn't use s/m)
+
+  head_scale:
+    distribution: uniform
+    min: 32.0
+    max: 80.0
+
+  head_margin:
+    distribution: uniform
+    min: 0.2
+    max: 0.5
+
+command:
+  - python
+  - ${program}
+  - ${args}
+  - --no_roc
+  - --no_wandb_model

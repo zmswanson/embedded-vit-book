@@ -12,3 +12,4 @@ timm_layers.py
 exp_timm_models.txt
 tinyface_sizes.py
 multirun.sh
+sweep*.log

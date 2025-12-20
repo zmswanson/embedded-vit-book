@@ -17,6 +17,7 @@ from lightning_modules.timm_id_module import TimmIDModule
 from lightning_modules.callbacks import TinyFaceEvaluationCallback
 from model_eval.probe_gallery import MultiLabelMethod
 
+import os
 
 # -------------------------
 # CLI
@@ -26,48 +27,48 @@ def parse_args():
     p = argparse.ArgumentParser("TinyFace TIMM fine-tuning")
 
     # Model / data
-    p.add_argument("--model-name", type=str, default="swin_base_patch4_window7_224.ms_in1k")
-    p.add_argument("--img-size", type=int, default=96)
-    p.add_argument("--batch-size", type=int, default=512)
-    p.add_argument("--max-epochs", type=int, default=100)
+    p.add_argument("--model_name", type=str, default="swin_base_patch4_window7_224.ms_in1k")
+    p.add_argument("--img_size", type=int, default=96)
+    p.add_argument("--batch_size", type=int, default=512)
+    p.add_argument("--max_epochs", type=int, default=100)
     p.add_argument("--seed", type=int, default=73)
 
     # Optim
     p.add_argument("--lr", type=float, default=3e-4)
-    p.add_argument("--weight-decay", type=float, default=0.05)
-    p.add_argument("--label-smoothing", type=float, default=0.0)
+    p.add_argument("--weight_decay", type=float, default=0.05)
+    p.add_argument("--label_smoothing", type=float, default=0.0)
     p.add_argument(
-        "--backbone-dropout", type=float, default=0.0, 
+        "--backbone_dropout", type=float, default=0.0, 
         help="Dropout probability for the backbone embeddings."
     )
 
     # Head
-    p.add_argument("--head-type", type=str, default="linear", choices=["linear", "cosface", "adaface", "arcface"])
-    p.add_argument("--head-scale", type=float, help="Scale parameter for the head (used for cosface, adaface, arcface).")
-    p.add_argument("--head-margin", type=float, help="Margin parameter for the head (used for cosface, adaface, arcface).")
+    p.add_argument("--head_type", type=str, default="linear", choices=["linear", "cosface", "adaface", "arcface"])
+    p.add_argument("--head_scale", type=float, help="Scale parameter for the head (used for cosface, adaface, arcface).")
+    p.add_argument("--head_margin", type=float, help="Margin parameter for the head (used for cosface, adaface, arcface).")
 
     # LoRA (optional)
-    p.add_argument("--lora-enabled", action="store_true", help="Enable LoRA adapters in the backbone.")
-    p.add_argument("--lora-r", type=int, default=8)
-    p.add_argument("--lora-alpha", type=float, default=16.0)
-    p.add_argument("--lora-dropout", type=float, default=0.0)
+    p.add_argument("--lora_enabled", action="store_true", help="Enable LoRA adapters in the backbone.")
+    p.add_argument("--lora_r", type=int, default=8)
+    p.add_argument("--lora_alpha", type=float, default=16.0)
+    p.add_argument("--lora_dropout", type=float, default=0.0)
     p.add_argument(
-        "--lora-family",
+        "--lora_family",
         type=str,
         default="auto",
         choices=["auto", "vit", "swin", "pvt", "mobilevit", "levit", "efficientformer", "cnn"],
         help="Override inferred model family for LoRA target patterns.",
     )
     p.add_argument(
-        "--lora-target-regex",
+        "--lora_target_regex",
         type=str,
         default=None,
         help="Override LoRA target regex. If set, family-based defaults are ignored.",
     )
-    p.add_argument("--lora-qkv", action="store_true", help="Apply LoRA to QKV (family-specific).")
-    p.add_argument("--lora-proj", action="store_true", help="Apply LoRA to projection (family-specific).")
+    p.add_argument("--lora_qkv", action="store_true", help="Apply LoRA to QKV (family-specific).")
+    p.add_argument("--lora_proj", action="store_true", help="Apply LoRA to projection (family-specific).")
     p.add_argument(
-        "--lora-train-bias",
+        "--lora_train_bias",
         action="store_true",
         help="Also train biases (backbone) when LoRA is enabled.",
     )
@@ -77,7 +78,7 @@ def parse_args():
     # Comma-separated list, e.g.:--thawed-modules head,all_norm,last_blocks=2,all_attn
     # Valid options are defined in lightning_modules/timm_id_module.py.
     p.add_argument(
-        "--thawed-modules",
+        "--thawed_modules",
         type=str,
         default="",
         help=(
@@ -88,39 +89,39 @@ def parse_args():
 
     # Debug / reporting
     p.add_argument(
-        "--print-trainable-params",
+        "--print_trainable_params",
         action="store_true",
         help="Print trainable parameter names (requires_grad=True) and exit.",
     )
 
     # Rank-k eval
-    p.add_argument("--rank-k", type=int, default=10)
-    p.add_argument("--probe-batch-size", type=int, default=256)
+    p.add_argument("--rank_k", type=int, default=10)
+    p.add_argument("--probe_batch_size", type=int, default=256)
     p.add_argument(
-        "--multi-label-method",
+        "--multi_label_method",
         type=str,
         default="MAX",
         choices=[m.name for m in MultiLabelMethod],
     )
     p.add_argument(
-        "--eval-on",
+        "--eval_on",
         type=str,
         default="EVAL",
         choices=[d.name for d in DatasetType],
     )
-    p.add_argument("--no-roc", action="store_true")
+    p.add_argument("--no_roc", action="store_true")
 
     # Runtime
     p.add_argument("--precision", type=str, default="16-mixed")
     p.add_argument("--devices", type=int, default=1)
-    p.add_argument("--log-every-n-steps", type=int, default=50)
+    p.add_argument("--log_every_n_steps", type=int, default=50)
     p.add_argument("--deterministic", action="store_true")
 
     # Paths / W&B
-    p.add_argument("--tinyface-root", type=str, default=None)
-    p.add_argument("--wandb-project", type=str, default="tinyface-timm")
-    p.add_argument("--wandb-run-name", type=str, default=None)
-    p.add_argument("--no-wandb-model", action="store_true")
+    p.add_argument("--tinyface_root", type=str, default=None)
+    p.add_argument("--wandb_project", type=str, default="tinyface-timm")
+    p.add_argument("--wandb_run_name", type=str, default=None)
+    p.add_argument("--no_wandb_model", action="store_true")
 
     return p.parse_args()
 
@@ -209,17 +210,22 @@ def main():
     wandb_logger = WandbLogger(
         project=args.wandb_project,
         name=run_name,
-        log_model=not args.no_wandb_model,
+        log_model=("best" if not args.no_wandb_model else False),
         config=wandb_config,
     )
+
+    run_id = wandb_logger.experiment.id
+    wandb_dir = os.environ.get("WANDB_DIR", "./wandb")
+    ckpt_dir = os.path.join(wandb_dir, "checkpoints", args.wandb_project, run_id)
 
     # Callbacks
     callbacks = [
         ModelCheckpoint(
+            dirpath=ckpt_dir,
             monitor=f"tinyface/{args.eval_on.lower()}/rank@1",
             mode="max",
-            save_top_k=3,
-            save_last=True,
+            save_top_k=1,
+            save_last=False, # only best model, change if you want to manually stop
             filename="{epoch}-rank1{"
                      + f"tinyface/{args.eval_on.lower()}/rank@1"
                      + ":.3f}",
