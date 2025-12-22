@@ -29,6 +29,7 @@ def create_crossval_splits(n_splits: int =10):
     for i, val_set in enumerate(val_sets):
         print(f"TRAIN_SET_{i}: {len(val_set)} unique IDs")
 
+    return val_dict
 
 if __name__=="__main__":
     create_crossval_splits()

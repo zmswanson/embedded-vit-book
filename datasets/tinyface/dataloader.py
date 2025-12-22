@@ -1,6 +1,7 @@
 import os
 import glob
 from pathlib import Path
+from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -10,6 +11,9 @@ from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from PIL import Image
 from json import load as json_load
 from enum import Enum
+
+from logging import getLogger
+logger = getLogger(__name__)
 
 class DatasetType(Enum):
     TRAIN = 0
@@ -97,6 +101,87 @@ def get_eval_transforms(img_size: int = 224):
     return eval_transform
 
 
+def _scan_for_images(dataset_path: str):
+    """
+    Helper function to recursively scan a directory for image files
+    and return a list of their paths.
+
+    :param dataset_path: Path to the dataset directory.
+    :type dataset_path: str
+
+    :return: List of image file paths.
+    :rtype: List[str]
+    """
+    img_paths: List[str] = []
+
+    for root, _, files in os.walk(dataset_path):
+        for file in files:
+            if file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                img_paths.append(os.path.join(root, file))
+
+    return img_paths
+
+def _extract_subject_id(img_path: str | List[str]):
+    """
+    Helper function to extract the subject ID from an image file path or list of
+    image file paths. Assumes the filename format is <subject_id>_<other_info>.jpg
+    
+    :param img_path: Image file path or list of image file paths.
+    :type img_path: str or List[str]
+
+    :return: Subject ID or list of subject IDs.
+    :rtype: str or List[str]
+    """
+    if isinstance(img_path, list):
+        return [
+            os.path.basename(path).split("_", 1)[0]
+            for path in img_path
+        ]
+    else:
+        return os.path.basename(img_path).split("_", 1)[0]
+    
+
+def _get_crossval_ids(crossval_splits: int | List[int]):
+    """
+    Helper function to get the subject IDs for the specified cross-validation splits.
+
+    :param crossval_splits: Integer or list of integers representing the cross-validation splits.
+    :type crossval_splits: int or List[int]
+
+    :return: Set of subject IDs for the specified splits.
+    :rtype: Set[str]
+    """
+    if isinstance(crossval_splits, int):
+        crossval_splits = [crossval_splits]
+    elif not isinstance(crossval_splits, list):
+        raise ValueError("crossval_splits must be an int or a list of ints")
+    
+    crossval_path = os.path.join(
+        os.path.dirname(__file__), "cross_val_splits.json"
+    )
+
+    if not os.path.exists(crossval_path):
+        logger.info(
+            f"Cross-validation splits file not found: {crossval_path}. "
+            f"Running the _generate_cross_val.py script to create it."
+        )
+
+        from ._generate_cross_val import create_crossval_splits
+        crossval_data = create_crossval_splits()
+    else:
+        with open(crossval_path, "r") as f:
+            crossval_data = json_load(f)
+
+    # Extract all the subjects for the specified cross validation splits
+    subject_ids = set([
+        subject_id for i in crossval_splits
+        for subject_id in crossval_data[f"TRAIN_SET_{i}"]
+    ])
+
+    return subject_ids
+    
+
+
 class TinyFaceDataset(Dataset):
     """
     Custom dataset class for loading images from the TinyFace dataset.
@@ -113,57 +198,48 @@ class TinyFaceDataset(Dataset):
                       define your own transformations.
     :type transform: torchvision.transforms.Compose or None
     """
-    def __init__(self, tinyfaces_path, crossval_splits=None, transform=None):
-        self.root_path = Path(tinyfaces_path)
-        self.img_paths = [
-            img_path for img_path in
-            glob.glob(os.path.join(self.root_path, "**", "*.jpg"))
-        ]
+    def __init__(
+        self, tinyfaces_path, crossval_splits=None, transform=None,
+        subid_to_label_map: dict = None
+    ):
+        self.img_paths = _scan_for_images(str(tinyfaces_path))
 
         if len(self.img_paths) == 0:
-            # This handles the Testing_Set gallery and probe where we have a
-            # flat directory of images
-            self.img_paths = [
-                img_path for img_path in 
-                glob.glob(os.path.join(self.root_path, "*.jpg"))
-            ]
-            
-
-        if crossval_splits is not None:
-            if isinstance(crossval_splits, int):
-                crossval_splits = [crossval_splits]
-            elif not isinstance(crossval_splits, list):
-                raise ValueError("crossval_splits must be an int or a list of ints")
-            
-            crossval_path = os.path.join(
-                os.path.dirname(__file__), "cross_val_splits.json"
-            )
-
-            with open(crossval_path, "r") as f:
-                crossval_data = json_load(f)
-
-            # Extract all the subjects for the specified cross validation splits
-            self.subject_ids = set([
-                subject_id for i in crossval_splits
-                for subject_id in crossval_data[f"TRAIN_SET_{i}"]
-            ])
-
-            # Only keep the images that contain the selected subject_ids
+            raise ValueError(f"No images found in the specified path: {tinyfaces_path}")
+        
+        if subid_to_label_map is not None:
+            # Filter the image paths to only include those with subject IDs in the map
             self.img_paths = [
                 img_path for img_path in self.img_paths
-                if os.path.basename(img_path).split("_", 1)[0] in self.subject_ids
+                if os.path.basename(img_path).split("_", 1)[0] in subid_to_label_map
             ]
+            self.subject_ids = subid_to_label_map
+            self.label_lookup = {idx: sub_id for sub_id, idx in subid_to_label_map.items()}
+        else:
+            if crossval_splits is not None:
+                if isinstance(crossval_splits, int):
+                    crossval_splits = [crossval_splits]
+                elif not isinstance(crossval_splits, list):
+                    raise ValueError("crossval_splits must be an int or a list of ints")
+                
+                self.subject_ids = _get_crossval_ids(crossval_splits)
 
-        self.subject_ids = set([
-            os.path.basename(img_path).split("_", 1)[0]
-            for img_path in self.img_paths
-        ])
+                # Only keep the images that contain the selected subject_ids
+                self.img_paths = [
+                    img_path for img_path in self.img_paths
+                    if os.path.basename(img_path).split("_", 1)[0] in self.subject_ids
+                ]
 
-        # Sort the subject IDs to ensure consistent label assignment
-        self.subject_ids = sorted(list(self.subject_ids))
+            self.subject_ids = set([
+                os.path.basename(img_path).split("_", 1)[0]
+                for img_path in self.img_paths
+            ])
 
-        self.subject_ids = {sub_id: idx for idx, sub_id in enumerate(self.subject_ids)}
-        self.label_lookup = {idx: sub_id for sub_id, idx in self.subject_ids.items()}
+            # Sort the subject IDs to ensure consistent label assignment
+            self.subject_ids = sorted(list(self.subject_ids))
+
+            self.subject_ids = {sub_id: idx for idx, sub_id in enumerate(self.subject_ids)}
+            self.label_lookup = {idx: sub_id for sub_id, idx in self.subject_ids.items()}
 
         self.transform = transform
 
@@ -310,14 +386,17 @@ def get_eval_loaders(
     """
     tinyfaces_path = find_dataset_dir(tinyfaces_path, "Training_Set")
 
+    subject_ids = sorted(list(_get_crossval_ids(9)))
+    subid_to_label_map = {sub_id: idx for idx, sub_id in enumerate(subject_ids)}
+
     probe_dataset = TinyFaceDataset(
-        tinyfaces_path, crossval_splits=9,
-        transform=get_eval_transforms(img_size)
+        tinyfaces_path,transform=get_eval_transforms(img_size),
+        subid_to_label_map=subid_to_label_map
     )
 
     gallery_dataset = TinyFaceDataset(
-        tinyfaces_path, crossval_splits=9,
-        transform=get_eval_transforms(img_size)
+        tinyfaces_path, transform=get_eval_transforms(img_size),
+        subid_to_label_map=subid_to_label_map
     )
 
     # Take the first image from each subject for gallery and the rest for probes
@@ -374,14 +453,21 @@ def get_test_loaders(
     tinyfaces_path = find_dataset_dir(tinyfaces_path, "Testing_Set")
     gallery_path = find_dataset_dir(tinyfaces_path, "Gallery_Match")
     probe_path = find_dataset_dir(tinyfaces_path, "Probe")
+
+    probe_ids = set(_extract_subject_id(_scan_for_images(probe_path)))
+    gallery_ids = set(_extract_subject_id(_scan_for_images(gallery_path)))
+    all_ids = probe_ids.union(gallery_ids)
+    subid_to_label_map = {sub_id: idx for idx, sub_id in enumerate(sorted(list(all_ids)))}
     
     gallery_dataset = TinyFaceDataset(
         gallery_path, crossval_splits=None,
-        transform=get_eval_transforms(img_size)
+        transform=get_eval_transforms(img_size),
+        subid_to_label_map=subid_to_label_map
     )
     probe_dataset = TinyFaceDataset(
         probe_path, crossval_splits=None,
-        transform=get_eval_transforms(img_size)
+        transform=get_eval_transforms(img_size),
+        subid_to_label_map=subid_to_label_map
     )
 
     gallery_loader = DataLoader(
@@ -426,6 +512,12 @@ if __name__ == "__main__":
         len(probe_loader.dataset.subject_ids), " (P)\n", sep=""
     )
 
+    train_ids = set(train_loader.dataset.subject_ids.keys())
+    eval_ids = set(eval_gallery_loader.dataset.subject_ids.keys())
+
+    overlap_train_eval = train_ids.intersection(eval_ids)
+    print(f"Overlap between train and eval subject IDs: {len(overlap_train_eval)} subjects")
+
 
     # Print some data to verify
     for batch_idx, (images, labels) in enumerate(train_loader):
@@ -445,7 +537,7 @@ if __name__ == "__main__":
         print(
             f"Batch {batch_idx} - Images shape: {images.shape},"
             f"labels: {labels[:3]}",
-            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+            f"Subject IDs: {[eval_gallery_loader.dataset.label_lookup[l] for l in labels[:3]]}",
         )
         if batch_idx >= 2:
             break
@@ -455,7 +547,7 @@ if __name__ == "__main__":
         print(
             f"Batch {batch_idx} - Images shape: {images.shape},"
             f"labels: {labels[:3]}",
-            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+            f"Subject IDs: {[eval_probe_loader.dataset.label_lookup[l] for l in labels[:3]]}",
         )
         if batch_idx >= 2:
             break
@@ -467,7 +559,7 @@ if __name__ == "__main__":
         print(
             f"Batch {batch_idx} - Images shape: {images.shape},"
             f"labels: {labels[:3]}",
-            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+            f"Subject IDs: {[gallery_loader.dataset.label_lookup[l] for l in labels[:3]]}",
         )
         if batch_idx >= 2:
             break
@@ -477,7 +569,37 @@ if __name__ == "__main__":
         print(
             f"Batch {batch_idx} - Images shape: {images.shape},"
             f"labels: {labels[:3]}",
-            f"Subject IDs: {[train_loader.dataset.label_lookup[l] for l in labels[:3]]}",
+            f"Subject IDs: {[probe_loader.dataset.label_lookup[l] for l in labels[:3]]}",
         )
         if batch_idx >= 2:
             break
+
+    print()
+
+    def _check_label_mapping_consistency(ds1: TinyFaceDataset, ds2: TinyFaceDataset):
+        mismatches = 0
+        missing = 0
+
+        for label, subject_id in ds1.label_lookup.items():
+            if label in ds2.label_lookup:
+                probe_sub_id = ds2.label_lookup[label]
+                if subject_id != probe_sub_id:
+                    mismatches += 1
+            else:
+                missing += 1
+
+        return mismatches, missing
+    
+    mm, ms = _check_label_mapping_consistency(
+        gallery_loader.dataset, probe_loader.dataset
+    )
+
+    print(f"Label mapping consistency check between test gallery and probe datasets:")
+    print(f"Total mismatches: {mm}; Total missing labels in probe dataset: {ms}")
+
+    mm, ms = _check_label_mapping_consistency(
+        eval_gallery_loader.dataset, eval_probe_loader.dataset
+    )
+
+    print(f"Label mapping consistency check between eval gallery and probe datasets:")
+    print(f"Total mismatches: {mm}; Total missing labels in probe dataset: {ms}")

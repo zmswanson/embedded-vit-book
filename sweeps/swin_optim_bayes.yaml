@@ -2,8 +2,8 @@ program: training_pipeline.py
 method: bayes
 
 metric:
-  # name: tinyface/eval/rank@1 # match eval_on <EVAL/TEST> below
-  name: tinyface/test/rank@1
+  name: tinyface/eval/rank@1 # match eval_on <EVAL/TEST> below
+  # name: tinyface/test/rank@1
   goal: maximize
 
 parameters:
@@ -13,7 +13,7 @@ parameters:
   img_size:
     value: 96
   max_epochs:
-    value: 50
+    value: 30
   seed:
     value: 73
 
@@ -31,7 +31,7 @@ parameters:
 
   # Eval setup (sweep on EVAL, not TEST)
   eval_on:
-    value: "TEST"
+    value: "EVAL"
   rank_k:
     value: 5
 
@@ -50,7 +50,7 @@ parameters:
   lr:
     distribution: log_uniform_values
     min: 1.0e-5
-    max: 3.0e-3
+    max: 5.0e-3
 
   weight_decay:
     distribution: log_uniform_values
@@ -67,3 +67,4 @@ command:
   - ${program}
   - ${args}
   - --no_wandb_model
+  - --no_roc
