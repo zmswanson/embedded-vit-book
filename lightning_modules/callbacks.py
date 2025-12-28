@@ -102,3 +102,43 @@ class TinyFaceEvaluationCallback(Callback):
                         on_epoch=True,
                         logger=True,
                     )
+
+
+import lightning as L
+
+class GradualUnfreezeCallback(L.Callback):
+    def __init__(self, blocks, every_n_epochs=5, verbose=True):
+        """
+        Args:
+            blocks: list of nn.Module objects (ordered deepest → shallowest)
+            every_n_epochs: how often to unfreeze the next block
+        """
+        self.blocks = blocks
+        self.every_n_epochs = every_n_epochs
+        self.verbose = verbose
+        self._next_idx = 0
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        epoch = trainer.current_epoch
+
+        if epoch == 0:
+            return
+
+        if epoch % self.every_n_epochs != 0:
+            return
+
+        if self._next_idx >= len(self.blocks):
+            return
+
+        block = self.blocks[self._next_idx]
+
+        for p in block.parameters():
+            p.requires_grad = True
+
+        if self.verbose:
+            pl_module.print(
+                f"[gradual-unfreeze] Epoch {epoch}: unfroze block "
+                f"{self._next_idx + 1}/{len(self.blocks)}"
+            )
+
+        self._next_idx += 1

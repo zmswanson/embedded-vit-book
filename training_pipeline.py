@@ -14,10 +14,13 @@ from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from datasets.tinyface.dataloader import get_tinyface_path, DatasetType
 from lightning_modules.tinyface_datamodule import TinyFaceDataModule
 from lightning_modules.timm_id_module import TimmIDModule
-from lightning_modules.callbacks import TinyFaceEvaluationCallback
+from lightning_modules.callbacks import TinyFaceEvaluationCallback, GradualUnfreezeCallback
 from model_eval.probe_gallery import MultiLabelMethod
 
 import os
+
+from logging import getLogger
+logger = getLogger(__name__)
 
 # -------------------------
 # CLI
@@ -46,6 +49,8 @@ def parse_args():
     p.add_argument("--head_type", type=str, default="linear", choices=["linear", "cosface", "adaface", "arcface"])
     p.add_argument("--head_scale", type=float, help="Scale parameter for the head (used for cosface, adaface, arcface).")
     p.add_argument("--head_margin", type=float, help="Margin parameter for the head (used for cosface, adaface, arcface).")
+    p.add_argument("--adaface_h", type=float, help="h parameter for AdaFace head.")
+    p.add_argument("--adaface_t_alpha", type=float, help="t_alpha parameter for AdaFace head.")
 
     # LoRA (optional)
     p.add_argument("--lora_enabled", action="store_true", help="Enable LoRA adapters in the backbone.")
@@ -86,6 +91,10 @@ def parse_args():
             "Use 'none' to freeze everything (including head)."
         ),
     )
+
+    p.add_argument("--gradual_unfreeze", action="store_true")
+    p.add_argument("--unfreeze_every_epochs", type=int, help="Epoch interval for gradual unfreezing. If not set, inferred as max_epochs // num_blocks.")
+
 
     # Debug / reporting
     p.add_argument(
@@ -154,6 +163,12 @@ def main():
         if args.head_margin is None:
             args.head_margin = 0.35
 
+    if args.head_type == "adaface":
+        if args.adaface_h is None:
+            args.adaface_h = 0.33
+        if args.adaface_t_alpha is None:
+            args.adaface_t_alpha = 0.01
+
     # LoRA config
     if args.lora_enabled and not (args.lora_qkv or args.lora_proj or args.lora_target_regex):
         # If LoRA is enabled but no target specified, default to both
@@ -167,6 +182,8 @@ def main():
         head_type=args.head_type,
         head_scale=args.head_scale,
         head_margin=args.head_margin,
+        adaface_h=args.adaface_h,
+        adaface_t_alpha=args.adaface_t_alpha,
         img_size=args.img_size,
         lr=args.lr,
         weight_decay=args.weight_decay,
@@ -195,6 +212,9 @@ def main():
     head_tag = f"-{args.head_type}"
     if args.head_type in ["cosface", "adaface", "arcface"]:
         head_tag += f":s{args.head_scale}:m{args.head_margin}"
+
+    if args.head_type == "adaface":
+        head_tag += f":h{args.adaface_h}:ta{args.adaface_t_alpha}"
 
     lora_tag = ""
     if args.lora_enabled:
@@ -242,6 +262,32 @@ def main():
             eval_on=DatasetType[args.eval_on],
         ),
     ]
+
+    if args.gradual_unfreeze:
+        blocks = model.get_blocks_for_unfreeze()
+        num_blocks = len(blocks)
+
+        if num_blocks == 0:
+            raise RuntimeError("Gradual unfreeze requested, but no blocks were found.")
+
+        if args.unfreeze_every_epochs is None:
+            # round up to ensure all blocks are unfrozen by the end
+            from math import ceil
+            every_n_epochs = int(ceil(args.max_epochs / num_blocks))
+            # every_n_epochs = max(1, args.max_epochs // num_blocks)
+        else:
+            every_n_epochs = args.unfreeze_every_epochs
+
+        # log every_n_epochs
+        logger.info(f"Gradual unfreeze enabled: {num_blocks} blocks to unfreeze, every {every_n_epochs} epochs.")
+
+        callbacks.append(
+            GradualUnfreezeCallback(
+                blocks=blocks,
+                every_n_epochs=every_n_epochs,
+                verbose=True,
+            )
+        )
 
     trainer = L.Trainer(
         accelerator="gpu" if torch.cuda.is_available() else "cpu",

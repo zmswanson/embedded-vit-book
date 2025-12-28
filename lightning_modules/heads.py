@@ -63,6 +63,7 @@ class AdaFaceHead(nn.Module):
         # running stats of feature norms
         self.register_buffer("batch_mean", torch.tensor(20.0))
         self.register_buffer("batch_std", torch.tensor(100.0))
+        self.register_buffer("_stats_initialized", torch.tensor(False))  # bool-ish
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         # feature norm stats
@@ -70,8 +71,17 @@ class AdaFaceHead(nn.Module):
         with torch.no_grad():
             mean = x_norm.mean()
             std = x_norm.std().clamp_min(self.eps)
-            self.batch_mean = (1 - self.t_alpha) * self.batch_mean + self.t_alpha * mean
-            self.batch_std  = (1 - self.t_alpha) * self.batch_std  + self.t_alpha * std
+            # self.batch_mean = (1 - self.t_alpha) * self.batch_mean + self.t_alpha * mean
+            # self.batch_std  = (1 - self.t_alpha) * self.batch_std  + self.t_alpha * std
+
+            # Bootstrap on first batch to avoid bias
+            if not bool(self._stats_initialized.item()):
+                self.batch_mean.copy_(mean)
+                self.batch_std.copy_(std)
+                self._stats_initialized.fill_(True)
+            else:
+                self.batch_mean.mul_(1 - self.t_alpha).add_(self.t_alpha * mean)
+                self.batch_std.mul_(1 - self.t_alpha).add_(self.t_alpha * std)
 
         # margin scaler in [-h, h]
         margin_scaler = ((x_norm - self.batch_mean) / self.batch_std).clamp(-1, 1) * self.h  # [B,1]

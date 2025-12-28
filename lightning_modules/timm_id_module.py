@@ -313,6 +313,8 @@ class TimmIDModule(L.LightningModule):
         head_type: str = "linear",
         head_scale: float = 64.0,
         head_margin: float = 0.35,
+        adaface_h: float = 0.33,
+        adaface_t_alpha: float = 0.01,
         img_size: int = 96,
         lr: float = 3e-4,
         weight_decay: float = 0.05,
@@ -389,7 +391,8 @@ class TimmIDModule(L.LightningModule):
             )
         elif head_type == "adaface":
             self.head = AdaFaceHead(
-                feature_dim, num_classes, s=head_scale, m=head_margin
+                feature_dim, num_classes, s=head_scale, m=head_margin,
+                h=adaface_h, t_alpha=adaface_t_alpha,
             )
         elif head_type == "arcface":
             self.head = ArcFaceHead(
@@ -582,6 +585,17 @@ class TimmIDModule(L.LightningModule):
         opt = torch.optim.AdamW(params, lr=self.lr, weight_decay=self.weight_decay)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.trainer.max_epochs)
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
+
+
+    def get_blocks_for_unfreeze(self):
+        family = _infer_family(self.model_name)
+        block_names = _collect_block_modules(self.backbone, family)
+
+        name_to_module = dict(self.backbone.named_modules())
+        blocks = [name_to_module[n] for n in block_names if n in name_to_module]
+
+        # deepest first
+        return list(reversed(blocks))
 
 
 if __name__ == "__main__":

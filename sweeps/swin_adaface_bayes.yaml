@@ -21,8 +21,8 @@ parameters:
     value: 0.0
   backbone_dropout:
     value: 0.165
-  thawed_modules:
-    value: "last_stages=2"
+  # thawed_modules:
+  #   value: "last_stages=2"
   eval_on:
     value: "EVAL"
   rank_k:
@@ -34,29 +34,40 @@ parameters:
 
   # ---- Search space ----
   head_type:
-    values: ["cosface", "arcface", "adaface"]   # (drop linear from bayes; it doesn't use s/m)
+    value: "adaface"
 
   # Fixed set of scales (categorical grid)
   head_scale:
-    values: [32, 48, 64, 80]
+    values: [64, 80, 96, 112]
 
   # Continuous margin range (use in code only when head_type != linear)
   # ArcFace typical: ~0.30-0.50; CosFace typical: ~0.20-0.40; AdaFace often ~0.20-0.35
   # Use a single shared range for simplicity; let the optimizer discover good subranges per head.
   head_margin:
     distribution: uniform
-    min: 0.10
-    max: 0.50
+    min: 0.20
+    max: 0.40
+
+  adaface_h:
+    distribution: uniform
+    min: 0.2
+    max: 0.45
+
+  adaface_t_alpha:
+    distribution: log_uniform_values
+    min: 5.0e-3
+    max: 5.0e-2
 
   # Continuous LR range (log-uniform is almost always the right prior for LR)
   lr:
     distribution: log_uniform_values
-    min: 3.0e-5
+    min: 3.5e-5
     max: 6.0e-5
 
 command:
   - python
   - ${program}
   - ${args}
+  - --gradual_unfreeze
   - --no_roc
   - --no_wandb_model
