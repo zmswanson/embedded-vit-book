@@ -14,10 +14,13 @@ from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from datasets.tinyface.dataloader import get_tinyface_path, DatasetType
 from lightning_modules.tinyface_datamodule import TinyFaceDataModule
 from lightning_modules.timm_id_module import TimmIDModule
-from lightning_modules.callbacks import TinyFaceEvaluationCallback, GradualUnfreezeCallback
+from lightning_modules.callbacks import (
+    TinyFaceEvaluationCallback, GradualBlockUnfreezeCallback, GradualStageUnfreezeCallback
+)
 from model_eval.probe_gallery import MultiLabelMethod
 
 import os
+from math import ceil
 
 from logging import getLogger
 logger = getLogger(__name__)
@@ -92,8 +95,50 @@ def parse_args():
         ),
     )
 
-    p.add_argument("--gradual_unfreeze", action="store_true")
-    p.add_argument("--unfreeze_every_epochs", type=int, help="Epoch interval for gradual unfreezing. If not set, inferred as max_epochs // num_blocks.")
+    # Gradual unfreeze
+    p.add_argument(
+        "--gradual_unfreeze",
+        type=str,
+        choices=["block", "stage"],
+        help="Gradually unfreeze backbone blocks or stages during training.",
+    )
+
+    p.add_argument(
+        "--unfreeze_every_epochs",
+        type=int,
+        help="Epoch interval for gradual unfreezing. If None, inferred as max_epochs // num_blocks_to_thaw.",
+    )
+    p.add_argument(
+        "--thaw_N_blocks",
+        type=int,
+        help="Number of blocks to unfreeze (only for --gradual_unfreeze block). Overrides --thaw_block_pct.",
+    )
+    p.add_argument(
+        "--thaw_block_pct",
+        type=float,
+        default=1.0,
+        help="Fraction of blocks to unfreeze (only for --gradual_unfreeze block).",
+    )
+    p.add_argument(
+        "--thaw_N_stages",
+        type=int,
+        help="Number of stages to unfreeze (only for --gradual_unfreeze stage). Overrides --thaw_stage_pct.",
+    )
+    p.add_argument(
+        "--thaw_stage_pct",
+        type=float,
+        default=1.0,
+        help="Fraction of stages to unfreeze (only for --gradual_unfreeze stage).",
+    )
+
+
+    # Warmup (only used when gradual_unfreeze is enabled unless explicitly overridden)
+    p.add_argument(
+        "--warmup_epochs",
+        type=int,
+        help="Warmup epochs for LR (warmup+cosine). If None and gradual_unfreeze, inferred automatically.",
+    )
+
 
 
     # Debug / reporting
@@ -186,6 +231,7 @@ def main():
         adaface_t_alpha=args.adaface_t_alpha,
         img_size=args.img_size,
         lr=args.lr,
+        warmup_epochs=(0 if not args.gradual_unfreeze else (args.warmup_epochs or 0)),
         weight_decay=args.weight_decay,
         label_smoothing=args.label_smoothing,
         backbone_dropout=args.backbone_dropout,
@@ -263,31 +309,74 @@ def main():
         ),
     ]
 
-    if args.gradual_unfreeze:
-        blocks = model.get_blocks_for_unfreeze()
-        num_blocks = len(blocks)
+    if args.warmup_epochs is not None and args.warmup_epochs > 0:
+        model.warmup_epochs = args.warmup_epochs
 
-        if num_blocks == 0:
-            raise RuntimeError("Gradual unfreeze requested, but no blocks were found.")
+    if args.gradual_unfreeze is not None:
+        # Infer warmup if not provided:
+        # rule: warm up for ~one interval (or at least 1), but not more than 10% of training.
+        if args.warmup_epochs is None:
+            model.warmup_epochs = min(max(1, every_n_epochs), max(1, args.max_epochs // 10))
 
-        if args.unfreeze_every_epochs is None:
-            # round up to ensure all blocks are unfrozen by the end
-            from math import ceil
-            every_n_epochs = int(ceil(args.max_epochs / num_blocks))
-            # every_n_epochs = max(1, args.max_epochs // num_blocks)
-        else:
-            every_n_epochs = args.unfreeze_every_epochs
+        if args.gradual_unfreeze == "block":
+            blocks_all = model.get_blocks_for_unfreeze()   # deepest -> shallowest
+            num_blocks_total = len(blocks_all)
+            if num_blocks_total == 0:
+                raise RuntimeError("Gradual unfreeze requested, but no blocks were found.")
+            if args.thaw_N_blocks is not None:
+                num_blocks_to_thaw = min(args.thaw_N_blocks, num_blocks_total)
+            else:
+                if not (0.0 < args.thaw_block_pct <= 1.0):
+                    raise ValueError("--thaw_block_pct must be in (0.0, 1.0].")
 
-        # log every_n_epochs
-        logger.info(f"Gradual unfreeze enabled: {num_blocks} blocks to unfreeze, every {every_n_epochs} epochs.")
+                num_blocks_to_thaw = max(1, int(ceil(args.thaw_block_pct * num_blocks_total)))
 
-        callbacks.append(
-            GradualUnfreezeCallback(
-                blocks=blocks,
-                every_n_epochs=every_n_epochs,
-                verbose=True,
+            blocks = blocks_all[:num_blocks_to_thaw]  # thaw only this fraction (deepest first)
+
+            # Infer interval if not provided
+            if args.unfreeze_every_epochs is None:
+                # every_n_epochs = max(1, args.max_epochs // num_blocks_to_thaw)
+                every_n_epochs = max(1, (args.max_epochs // 2) // num_blocks_to_thaw)
+            else:
+                every_n_epochs = max(1, int(args.unfreeze_every_epochs))
+
+
+            callbacks.append(
+                GradualBlockUnfreezeCallback(
+                    blocks=blocks,
+                    every_n_epochs=every_n_epochs,
+                    verbose=True,
+                )
             )
-        )
+        elif args.gradual_unfreeze == "stage":
+            stages = model.get_stages_for_unfreeze()   # deepest -> shallowest
+            num_stages_total = len(stages)
+            if num_stages_total == 0:
+                raise RuntimeError("Gradual unfreeze requested, but no stages were found.")
+
+            if args.thaw_N_stages is not None:
+                num_stages_to_thaw = min(args.thaw_N_stages, num_stages_total)
+            else:
+                if not (0.0 < args.thaw_stage_pct <= 1.0):
+                    raise ValueError("--thaw_stage_pct must be in (0.0, 1.0].")
+
+                num_stages_to_thaw = max(1, int(ceil(args.thaw_stage_pct * num_stages_total)))
+
+            stages = stages[:num_stages_to_thaw]  # thaw only this fraction (deepest first)
+
+            # Infer interval if not provided
+            if args.unfreeze_every_epochs is None:
+                every_n_epochs = max(1, (args.max_epochs // 2) // num_stages_total)
+            else:
+                every_n_epochs = max(1, int(args.unfreeze_every_epochs))
+
+            callbacks.append(
+                GradualStageUnfreezeCallback(
+                    stages=stages,
+                    every_n_epochs=every_n_epochs,
+                    verbose=True,
+                )
+            )
 
     trainer = L.Trainer(
         accelerator="gpu" if torch.cuda.is_available() else "cpu",

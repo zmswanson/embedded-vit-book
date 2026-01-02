@@ -13,3 +13,6 @@ exp_timm_models.txt
 tinyface_sizes.py
 multirun.sh
 sweep*.log
+param_count_analysis.txt
+parameters_by_block.py
+test.sh

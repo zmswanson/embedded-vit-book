@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import lightning as L
 import timm
+import math
+from torch.optim.lr_scheduler import LambdaLR
 
 
 # ----------------------------
@@ -301,6 +303,26 @@ def _collect_head_modules(model: nn.Module) -> List[str]:
     return uniq
 
 
+def _check_img_size_required(model_name: str) -> bool:
+    """
+    Check if the model family requires a specific image size in the
+    create_model call.
+    
+    :param model_name: timm model name
+    :return: True if specific img_size is required, False if not
+    """
+    family = _infer_family(model_name)
+
+    if family in {"resnet", "convnext", "pvt"}:
+        return False
+    elif family in {"vit", "deit", "swin", "mobilevit"}:
+        return True
+    else:
+        raise NotImplementedError(
+            f"Image size requirement check not implemented for family '{family}'."
+        )
+
+
 # ----------------------------
 # Lightning module
 # ----------------------------
@@ -317,6 +339,7 @@ class TimmIDModule(L.LightningModule):
         adaface_t_alpha: float = 0.01,
         img_size: int = 96,
         lr: float = 3e-4,
+        warmup_epochs: int = 0,
         weight_decay: float = 0.05,
         label_smoothing: float = 0.0,
         backbone_dropout: float = 0.0,
@@ -342,6 +365,7 @@ class TimmIDModule(L.LightningModule):
         self.num_classes = num_classes
         self.img_size = img_size
         self.lr = lr
+        self.warmup_epochs = warmup_epochs
         self.weight_decay = weight_decay
         self.label_smoothing = label_smoothing
         self.backbone_dropout_p = backbone_dropout
@@ -366,12 +390,19 @@ class TimmIDModule(L.LightningModule):
             apply_proj=lora_apply_proj,
         )
 
+        create_model_kwargs = {
+            "pretrained": pretrained,
+            "num_classes": 0,  # we want feature embeddings from backbone
+        }
+
+        if _check_img_size_required(model_name):
+            create_model_kwargs["img_size"] = img_size
+
+
         # timm: many models accept img_size; for ones that don't, timm ignores it
         self.backbone = timm.create_model(
             model_name,
-            pretrained=pretrained,
-            num_classes=0, # we only want embedding features
-            img_size=img_size,
+            **create_model_kwargs
         )
 
         # Optional: inject LoRA adapters into selected backbone Linear layers
@@ -580,10 +611,37 @@ class TimmIDModule(L.LightningModule):
         self.log("val/loss", loss, prog_bar=True)
         return loss
 
+    # def configure_optimizers(self):
+    #     params = [p for p in self.parameters() if p.requires_grad]
+    #     opt = torch.optim.AdamW(params, lr=self.lr, weight_decay=self.weight_decay)
+    #     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.trainer.max_epochs)
+    #     return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
+
     def configure_optimizers(self):
-        params = [p for p in self.parameters() if p.requires_grad]
-        opt = torch.optim.AdamW(params, lr=self.lr, weight_decay=self.weight_decay)
-        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.trainer.max_epochs)
+        opt = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+        max_epochs = int(self.trainer.max_epochs) if self.trainer is not None else 1
+        warmup_epochs = max(0, int(getattr(self, "warmup_epochs", 0)))
+
+        if warmup_epochs > 0:
+            min_lr_ratio = 0.001 # final lr will be min_lr_ratio 
+            # Warmup for warmup_epochs, then cosine to 0 by max_epochs
+            def lr_lambda(epoch: int):
+                # Warmup
+                if epoch < warmup_epochs:
+                    return float(epoch + 1) / float(warmup_epochs)
+
+                # Cosine decay with floor
+                t = (epoch - warmup_epochs) / max(1, (max_epochs - warmup_epochs))
+                cosine = 0.5 * (1.0 + math.cos(math.pi * t))
+
+                # Scale cosine into [min_lr_ratio, 1.0]
+                return min_lr_ratio + (1.0 - min_lr_ratio) * cosine
+
+            sched = LambdaLR(opt, lr_lambda=lr_lambda)
+        else:
+            sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max_epochs)
+
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
 
 
@@ -596,6 +654,16 @@ class TimmIDModule(L.LightningModule):
 
         # deepest first
         return list(reversed(blocks))
+
+    def get_stages_for_unfreeze(self):
+        family = _infer_family(self.model_name)
+        stage_names = _collect_stage_modules(self.backbone, family)
+
+        name_to_module = dict(self.backbone.named_modules())
+        stages = [name_to_module[n] for n in stage_names if n in name_to_module]
+
+        # deepest first
+        return list(reversed(stages))
 
 
 if __name__ == "__main__":

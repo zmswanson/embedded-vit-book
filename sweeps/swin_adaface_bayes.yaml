@@ -38,7 +38,7 @@ parameters:
 
   # Fixed set of scales (categorical grid)
   head_scale:
-    values: [64, 80, 96, 112]
+    values: [64, 80, 96]
 
   # Continuous margin range (use in code only when head_type != linear)
   # ArcFace typical: ~0.30-0.50; CosFace typical: ~0.20-0.40; AdaFace often ~0.20-0.35
@@ -61,13 +61,20 @@ parameters:
   # Continuous LR range (log-uniform is almost always the right prior for LR)
   lr:
     distribution: log_uniform_values
-    min: 3.5e-5
-    max: 6.0e-5
+    min: 5.0e-5
+    max: 5.0e-3
 
 command:
   - python
   - ${program}
   - ${args}
   - --gradual_unfreeze
+  - stage
+  - --thaw_N_stages
+  - 2
+  - --unfreeze_every_epochs
+  - 5
+  - --warmup_epochs
+  - 7
   - --no_roc
   - --no_wandb_model
