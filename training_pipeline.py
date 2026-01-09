@@ -22,8 +22,17 @@ from model_eval.probe_gallery import MultiLabelMethod
 import os
 from math import ceil
 
+from enum import Enum
+
 from logging import getLogger
 logger = getLogger(__name__)
+
+# create enum for qkv/proj choices
+class LoRATargetChoice(Enum):
+    NONE = 0
+    QKV = 1
+    PROJ = 2
+    BOTH = 3
 
 # -------------------------
 # CLI
@@ -73,11 +82,14 @@ def parse_args():
         default=None,
         help="Override LoRA target regex. If set, family-based defaults are ignored.",
     )
-    p.add_argument("--lora_qkv", action="store_true", help="Apply LoRA to QKV (family-specific).")
-    p.add_argument("--lora_proj", action="store_true", help="Apply LoRA to projection (family-specific).")
     p.add_argument(
-        "--lora_train_bias",
-        action="store_true",
+        "--lora_qkv_proj", type=int, default=LoRATargetChoice.NONE.value,
+        choices=[e.value for e in LoRATargetChoice],
+        help="LoRA target choice: 0=none, 1=QKV, 2=proj, 3=both (family-specific)."
+    )
+    
+    p.add_argument(
+        "--lora_train_bias", type=int, default=0, choices=[0, 1],
         help="Also train biases (backbone) when LoRA is enabled.",
     )
 
@@ -143,8 +155,7 @@ def parse_args():
 
     # Debug / reporting
     p.add_argument(
-        "--print_trainable_params",
-        action="store_true",
+        "--print_trainable_params", action="store_true",
         help="Print trainable parameter names (requires_grad=True) and exit.",
     )
 
@@ -163,19 +174,19 @@ def parse_args():
         default="EVAL",
         choices=[d.name for d in DatasetType],
     )
-    p.add_argument("--no_roc", action="store_true")
+    p.add_argument("--no_roc", action="store_true", default=False)
 
     # Runtime
     p.add_argument("--precision", type=str, default="16-mixed")
     p.add_argument("--devices", type=int, default=1)
     p.add_argument("--log_every_n_steps", type=int, default=50)
-    p.add_argument("--deterministic", action="store_true")
+    p.add_argument("--deterministic", action="store_true", default=False)
 
     # Paths / W&B
     p.add_argument("--tinyface_root", type=str, default=None)
     p.add_argument("--wandb_project", type=str, default="tinyface-timm")
     p.add_argument("--wandb_run_name", type=str, default=None)
-    p.add_argument("--no_wandb_model", action="store_true")
+    p.add_argument("--no_wandb_model", action="store_true", default=False)
 
     return p.parse_args()
 
@@ -214,11 +225,15 @@ def main():
         if args.adaface_t_alpha is None:
             args.adaface_t_alpha = 0.01
 
-    # LoRA config
-    if args.lora_enabled and not (args.lora_qkv or args.lora_proj or args.lora_target_regex):
-        # If LoRA is enabled but no target specified, default to both
-        args.lora_qkv = True
-        args.lora_proj = True
+    # If LoRA is enabled but no target specified, default to both QKV and proj
+    if args.lora_enabled and args.lora_target_regex is None:
+        if args.lora_qkv_proj == LoRATargetChoice.NONE.value:
+            args.lora_qkv_proj = LoRATargetChoice.BOTH.value
+
+    if args.lora_train_bias == 0:
+        args.lora_train_bias = False
+    else:
+        args.lora_train_bias = True
 
     # Model
     model = TimmIDModule(
@@ -244,8 +259,8 @@ def main():
         lora_dropout=args.lora_dropout,
         lora_family=args.lora_family,
         lora_target_regex=args.lora_target_regex,
-        lora_apply_qkv=args.lora_qkv,
-        lora_apply_proj=args.lora_proj,
+        lora_apply_qkv=args.lora_qkv_proj in (LoRATargetChoice.QKV.value, LoRATargetChoice.BOTH.value),
+        lora_apply_proj=args.lora_qkv_proj in (LoRATargetChoice.PROJ.value, LoRATargetChoice.BOTH.value),
         lora_train_bias=args.lora_train_bias,
 
     )
@@ -265,8 +280,10 @@ def main():
     lora_tag = ""
     if args.lora_enabled:
         lora_tag = f"-lora(r{args.lora_r}-a{args.lora_alpha}-d{args.lora_dropout})" \
-                   f"{',qkv' if args.lora_qkv else ''}{',proj' if args.lora_proj else ''}" \
-                   f"{',' + str(args.lora_target_regex) if args.lora_target_regex else ''}"
+                   f"{',qkv' if args.lora_qkv_proj in (LoRATargetChoice.QKV.value, LoRATargetChoice.BOTH.value) else ''}" \
+                   f"{',proj' if args.lora_qkv_proj in (LoRATargetChoice.PROJ.value, LoRATargetChoice.BOTH.value) else ''}" \
+                   f"{',' + str(args.lora_target_regex) if args.lora_target_regex else ''}" \
+                   f"{',train_bias' if args.lora_train_bias else ''}"
 
     run_name = args.wandb_run_name or (
         f"{args.model_name}-img{args.img_size}-bs{args.batch_size}-lr{args.lr}" +

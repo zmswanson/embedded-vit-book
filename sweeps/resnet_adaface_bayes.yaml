@@ -1,0 +1,80 @@
+program: training_pipeline.py
+method: bayes
+metric:
+  name: tinyface/eval/rank@1
+  # name: tinyface/test/rank@1
+  goal: maximize
+
+parameters:
+  # ---- Fixed ----
+  model_name:
+    value: resnet200d.ra2_in1k 
+  img_size:
+    value: 96
+  batch_size:
+    value: 8
+  max_epochs:
+    value: 40
+  weight_decay:
+    value: 1.0e-5
+  label_smoothing:
+    value: 0.0
+  backbone_dropout:
+    value: 0.165
+  # thawed_modules:
+  #   value: "last_stages=2"
+  eval_on:
+    value: "EVAL"
+  rank_k:
+    value: 5
+  precision:
+    value: "16-mixed"
+  devices:
+    value: 1
+
+  # ---- Search space ----
+  head_type:
+    value: "adaface"
+
+  # Fixed set of scales (categorical grid)
+  head_scale:
+    values: [64, 80, 96]
+
+  # Continuous margin range (use in code only when head_type != linear)
+  # ArcFace typical: ~0.30-0.50; CosFace typical: ~0.20-0.40; AdaFace often ~0.20-0.35
+  # Use a single shared range for simplicity; let the optimizer discover good subranges per head.
+  head_margin:
+    distribution: uniform
+    min: 0.20
+    max: 0.40
+
+  adaface_h:
+    distribution: uniform
+    min: 0.2
+    max: 0.45
+
+  adaface_t_alpha:
+    distribution: log_uniform_values
+    min: 5.0e-3
+    max: 5.0e-2
+
+  # Continuous LR range (log-uniform is almost always the right prior for LR)
+  lr:
+    distribution: log_uniform_values
+    min: 5.0e-5
+    max: 5.0e-3
+
+command:
+  - python
+  - ${program}
+  - ${args}
+  - --gradual_unfreeze
+  - stage
+  - --thaw_N_stages
+  - 2
+  - --unfreeze_every_epochs
+  - 5
+  - --warmup_epochs
+  - 7
+  - --no_roc
+  - --no_wandb_model

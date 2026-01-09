@@ -1,3 +1,4 @@
+import os
 import torch
 import lightning as L
 
@@ -51,7 +52,10 @@ def run_inference(
         enable_checkpointing=False,
     )
 
-    trainer.validate(model, datamodule=dm, ckpt_path=ckpt_path)
+    return trainer.validate(model=model, datamodule=dm)
+
+
+
 
 if __name__ == "__main__":
     import argparse
@@ -81,12 +85,85 @@ if __name__ == "__main__":
         default=512,
         help="Batch size for inference",
     )
+    parser.add_argument(
+        "--wandb_id",
+        type=str,
+        required=False,
+        help="WandB run ID",
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        required=False,
+        help="Path to save the inference results",
+    )
+
+    # # LoRA (optional)
+    # parser.add_argument("--lora_enabled", action="store_true", help="Enable LoRA adapters in the backbone.")
+    # parser.add_argument("--lora_r", type=int, default=8)
+    # parser.add_argument("--lora_alpha", type=float, default=16.0)
+    # parser.add_argument("--lora_dropout", type=float, default=0.0)
+    # parser.add_argument(
+    #     "--lora_family",
+    #     type=str,
+    #     default="auto",
+    #     choices=["auto", "vit", "swin", "pvt", "mobilevit", "levit", "efficientformer", "cnn"],
+    #     help="Override inferred model family for LoRA target patterns.",
+    # )
+    # parser.add_argument(
+    #     "--lora_target_regex",
+    #     type=str,
+    #     default=None,
+    #     help="Override LoRA target regex. If set, family-based defaults are ignored.",
+    # )
+    # parser.add_argument("--lora_qkv", action="store_true", help="Apply LoRA to QKV (family-specific).")
+    # parser.add_argument("--lora_proj", action="store_true", help="Apply LoRA to projection (family-specific).")
 
     args = parser.parse_args()
 
-    run_inference(
+    results = run_inference(
         ckpt_path=args.ckpt_path,
         model_name=args.model_name,
         img_size=args.img_size,
         batch_size=args.batch_size,
     )
+
+    save_keys = [
+        'tinyface/test/rank@1',
+        'tinyface/test/rank@2',
+        'tinyface/test/rank@3',
+        'tinyface/test/rank@4',
+        'tinyface/test/rank@5',
+        'tinyface/test/rank@6',
+        'tinyface/test/rank@7',
+        'tinyface/test/rank@8',
+        'tinyface/test/rank@9',
+        'tinyface/test/rank@10',
+        'tinyface/test/auc',
+        'tinyface/test/mAP',
+        'tinyface/test/eer',
+        'tinyface/test/tpr_at_fpr_1pct',
+        'tinyface/test/tpr_at_fpr_5pct',
+    ]
+
+    if args.save_path:
+        if not os.path.exists(args.save_path):
+            if not os.path.exists(os.path.dirname(args.save_path)):
+                os.makedirs(os.path.dirname(args.save_path))
+            with open(args.save_path, "w") as f:
+                f.write("wandb_id,model_name")
+                for key in save_keys:
+                    f.write(f",{key}")
+                f.write("\n")
+
+        with open(args.save_path, "a") as f:
+            f.write(f"{args.wandb_id},{args.model_name}")
+            for key in save_keys:
+                f.write(f",{results[0].get(key, '')}")
+            f.write("\n")
+    else:
+        print(f"Inference results: {len(results)}")
+        for k, v in results[0].items():
+            if k in save_keys:
+                print(f"{k}: {v}")
+    

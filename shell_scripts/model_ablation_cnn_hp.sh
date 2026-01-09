@@ -26,10 +26,10 @@ fi
 
 for model_thaw in "${model_thaw_list[@]}"; do
     echo "Running model ablation with settings: $model_thaw"
-    python training_pipeline.py ${model_thaw} --img_size 96 --batch_size 8 \
-        --max_epochs 50 --lr 5.782e-4 --weight_decay 1.0e-5 \
-        --backbone_dropout 0.165 --head_type adaface --head_scale 96 \
-        --head_margin 0.357 --adaface_h 0.2015 --adaface_t_alpha 0.0438 \
+    python training_pipeline.py ${model_thaw} --img_size 96 --batch_size 16 \
+        --max_epochs 50 --lr 2.9e-4 --weight_decay 1.0e-5 \
+        --backbone_dropout 0.0 --head_type arcface \
+        --head_scale 48 --head_margin 2.5e-4 \
         --warmup_epochs 8 --unfreeze_every_epochs 5  --rank_k 10 \
         --wandb_project model_ablation_study --no_wandb_model
 done

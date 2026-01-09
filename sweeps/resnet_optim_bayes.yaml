@@ -1,0 +1,72 @@
+program: training_pipeline.py
+method: bayes
+
+metric:
+  name: tinyface/eval/rank@1 # match eval_on <EVAL/TEST> below
+  # name: tinyface/test/rank@1
+  goal: maximize
+
+parameters:
+  # ---- Fixed ----
+  model_name:
+    value: resnet200d.ra2_in1k
+  img_size:
+    value: 96
+  max_epochs:
+    value: 40
+  seed:
+    value: 73
+
+  # Linear head only
+  head_type:
+    values: ["linear", "cosface", "arcface"]
+  head_scale:
+    values: [32, 48, 64, 80, 96]   # ignored by linear, but harmless
+  head_margin:
+    distribution: uniform
+    min: 1.0e-5
+    max: 5.0e-4
+
+  # Eval setup (sweep on EVAL, not TEST)
+  eval_on:
+    value: "EVAL"
+  rank_k:
+    value: 5
+
+  # Runtime
+  precision:
+    value: "16-mixed"
+  devices:
+    value: 1
+  log_every_n_steps:
+    value: 25
+
+  # ---- Search space ----
+  batch_size:
+    values: [8, 16, 32, 64, 128]
+
+  lr:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-4
+
+  weight_decay:
+    value: 1.0e-5
+
+  backbone_dropout:
+    value: 0.0
+
+command:
+  - python
+  - ${program}
+  - ${args}
+  - --no_wandb_model
+  - --no_roc
+  - --gradual_unfreeze
+  - stage
+  - --thaw_N_stages
+  - 2
+  - --unfreeze_every_epochs
+  - 5
+  - --warmup_epochs
+  - 7

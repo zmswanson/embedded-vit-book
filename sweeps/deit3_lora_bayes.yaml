@@ -1,0 +1,75 @@
+program: training_pipeline.py
+method: bayes
+metric:
+  name: tinyface/eval/rank@1
+  goal: maximize
+
+parameters:
+  # ---- Fixed ----
+  model_name:
+    value: deit3_base_patch16_224.fb_in1k
+  img_size:
+    value: 96
+  batch_size:
+    value: 8
+  max_epochs:
+    value: 40
+  label_smoothing:
+    value: 0.0
+  backbone_dropout:
+    value: 0.0
+  eval_on:
+    value: "EVAL"
+  rank_k:
+    value: 5
+  precision:
+    value: "16-mixed"
+  devices:
+    value: 1
+  head_type:
+    value: "adaface"
+  head_scale:
+    value: 96
+  head_margin:
+    value: 0.357
+  adaface_h:
+    value: 0.2015
+  adaface_t_alpha:
+    value: 0.0438
+
+
+  # ---- Search space ----
+  lr:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-4
+  
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1e-6
+    max: 5e-4
+
+  lora_r:
+    values: [32, 64, 96]
+
+  lora_alpha:
+    values: [32, 64, 128]
+
+  lora_dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.2
+
+  lora_qkv_proj:
+    values: [1,  3] # 0: NONE, 1: QKV, 2: PROJ, 3: BOTH
+
+  lora_train_bias:
+    values: [0, 1] # 0: False, 1: True
+
+command:
+  - python
+  - ${program}
+  - ${args}
+  - --no_roc
+  - --no_wandb_model
+  - --lora_enabled
