@@ -17,3 +17,5 @@ param_count_analysis.txt
 parameters_by_block.py
 test.sh
 .ignore/
+.github/
+.vscode/
