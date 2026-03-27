@@ -7,7 +7,7 @@ metric:
 parameters:
   # ---- Fixed ----
   model_name:
-    value: deit3_base_patch16_224.fb_in1k
+    value: swin_base_patch4_window7_224.ms_in1k
   img_size:
     value: 96
   batch_size:
@@ -31,7 +31,7 @@ parameters:
   head_scale:
     values: [32, 64, 80, 96]
   head_margin:
-    value: 0.00001
+    value: 1e-6
   adaface_h:
     value: 0.2015
   adaface_t_alpha:
