@@ -19,3 +19,4 @@ test.sh
 .ignore/
 .github/
 .vscode/
+*.log
