@@ -1,3 +1,5 @@
+import torch
+
 from datasets.tinyface.dataloader import (
     get_eval_loaders, get_test_loaders, DatasetType, get_tinyface_path
 )

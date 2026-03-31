@@ -293,6 +293,8 @@ class TeacherFineTuneModule(L.LightningModule):
         lr: float = 1e-4,
         weight_decay: float = 1e-5,
         warmup_epochs: int = 5,
+        freeze_backbone_epochs: int = 5,
+        backbone_lr_factor: float = 0.1,
         label_smoothing: float = 0.0,
         img_size: int = 112,
     ):
@@ -302,19 +304,21 @@ class TeacherFineTuneModule(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.warmup_epochs = warmup_epochs
+        self.freeze_backbone_epochs = freeze_backbone_epochs
+        self.backbone_lr_factor = backbone_lr_factor
         self.label_smoothing = label_smoothing
         self.teacher_type = teacher_type
 
-        # Load pretrained backbone (UNFROZEN for fine-tuning)
+        # Load pretrained backbone
         if teacher_type == "cvlface_vit_base":
             _download_cvlface(_CVLFACE_REPO_ID, _CVLFACE_CACHE)
             self.backbone = _load_cvlface_model(_CVLFACE_CACHE)
         else:
             raise ValueError(f"Unknown teacher_type: {teacher_type}")
 
-        # All params trainable
+        # Start with backbone frozen — head needs to warm up first
         for p in self.backbone.parameters():
-            p.requires_grad = True
+            p.requires_grad = False
 
         emb_dim = 512  # CVLFace outputs 512-d
 
@@ -339,6 +343,16 @@ class TeacherFineTuneModule(L.LightningModule):
             emb = emb[0]
         return F.normalize(emb, dim=1)
 
+    def on_train_epoch_start(self):
+        """Unfreeze backbone after head warmup epochs."""
+        epoch = self.current_epoch
+        if epoch == self.freeze_backbone_epochs:
+            logger.info(f"Epoch {epoch}: unfreezing backbone for fine-tuning")
+            for p in self.backbone.parameters():
+                p.requires_grad = True
+        frozen = not any(p.requires_grad for p in self.backbone.parameters())
+        self.log("train/backbone_frozen", float(frozen), prog_bar=False)
+
     def training_step(self, batch, batch_idx):
         x, y = batch
         emb = self.backbone(x)
@@ -358,7 +372,14 @@ class TeacherFineTuneModule(L.LightningModule):
         self.log("val/loss", torch.tensor(0.0), prog_bar=False)
 
     def configure_optimizers(self):
-        opt = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        # Discriminative LR: backbone gets lower LR to preserve pretrained features
+        backbone_params = list(self.backbone.parameters())
+        head_params = list(self.head.parameters())
+        param_groups = [
+            {"params": backbone_params, "lr": self.lr * self.backbone_lr_factor},
+            {"params": head_params, "lr": self.lr},
+        ]
+        opt = torch.optim.AdamW(param_groups, weight_decay=self.weight_decay)
 
         max_epochs = int(self.trainer.max_epochs) if self.trainer is not None else 1
         warmup_epochs = max(0, int(self.warmup_epochs))
@@ -384,8 +405,9 @@ class TeacherFineTuneModule(L.LightningModule):
 # Checkpoint callback that also saves backbone state_dict separately
 # ---------------------------------------------------------------------------
 class TeacherCheckpointCallback(Callback):
-    """After the best checkpoint is saved, also export the backbone state_dict
-    so it can be loaded by ``get_teacher(finetune_ckpt_path=...)``."""
+    """After training, export the BEST backbone state_dict (loaded from the
+    best ModelCheckpoint) so it can be loaded by
+    ``get_teacher(finetune_ckpt_path=...)``."""
 
     def __init__(self, save_dir: str):
         super().__init__()
@@ -394,9 +416,29 @@ class TeacherCheckpointCallback(Callback):
     def on_train_end(self, trainer, pl_module):
         os.makedirs(self.save_dir, exist_ok=True)
         path = os.path.join(self.save_dir, "teacher_backbone.pt")
-        torch.save(
-            {"backbone_state_dict": pl_module.backbone.state_dict()},
-            path,
+
+        # Try loading the best checkpoint to extract backbone weights
+        best_ckpt_path = trainer.checkpoint_callback.best_model_path
+        if best_ckpt_path and os.path.exists(best_ckpt_path):
+            ckpt = torch.load(best_ckpt_path, map_location="cpu")
+            state_dict = ckpt.get("state_dict", {})
+            backbone_sd = {
+                k.replace("backbone.", "", 1): v
+                for k, v in state_dict.items()
+                if k.startswith("backbone.")
+            }
+            logger.info(
+                f"Extracting backbone from best checkpoint: {best_ckpt_path} "
+                f"({len(backbone_sd)} params)"
+            )
+        else:
+            # Fallback: save current model state
+            backbone_sd = pl_module.backbone.state_dict()
+            logger.warning(
+                "No best checkpoint found, saving final model backbone instead"
+            )
+
+        torch.save({"backbone_state_dict": backbone_sd}, path)
         )
         logger.info(f"Saved teacher backbone state_dict to {path}")
 
@@ -418,6 +460,10 @@ def parse_args():
     p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--weight_decay", type=float, default=1e-5)
     p.add_argument("--warmup_epochs", type=int, default=5)
+    p.add_argument("--freeze_backbone_epochs", type=int, default=5,
+                    help="Freeze backbone for N epochs to let head warm up")
+    p.add_argument("--backbone_lr_factor", type=float, default=0.1,
+                    help="Backbone LR = lr * this factor (discriminative LR)")
     p.add_argument("--label_smoothing", type=float, default=0.0)
 
     p.add_argument("--head_type", type=str, default="adaface",
@@ -480,6 +526,8 @@ def main():
         lr=args.lr,
         weight_decay=args.weight_decay,
         warmup_epochs=args.warmup_epochs,
+        freeze_backbone_epochs=args.freeze_backbone_epochs,
+        backbone_lr_factor=args.backbone_lr_factor,
         label_smoothing=args.label_smoothing,
         img_size=args.img_size,
     )

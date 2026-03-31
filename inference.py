@@ -9,6 +9,13 @@ from lightning_modules.callbacks import TinyFaceEvaluationCallback
 from model_eval.probe_gallery import MultiLabelMethod
 
 
+def _is_kd_checkpoint(ckpt_path: str) -> bool:
+    """Detect whether a checkpoint was saved by KDTimmIDModule."""
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    hparams = ckpt.get("hyper_parameters", {})
+    return "kd_alpha" in hparams
+
+
 def run_inference(
     ckpt_path: str,
     model_name: str,
@@ -22,11 +29,19 @@ def run_inference(
         batch_size=batch_size,
     )
 
-    # Load model *from checkpoint*
-    model = TimmIDModule.load_from_checkpoint(
-        ckpt_path,
-        model_name=model_name,
-    )
+    # Load model *from checkpoint* — auto-detect KD vs standard
+    if _is_kd_checkpoint(ckpt_path):
+        from lightning_modules.kd_module import KDTimmIDModule
+        model = KDTimmIDModule.load_from_checkpoint(ckpt_path)
+        # Override validation_step: the KD module's validation_step tries
+        # F.cross_entropy on raw embeddings which can error.  The callback
+        # handles the actual evaluation, so a no-op is fine.
+        model.validation_step = lambda batch, batch_idx: None
+    else:
+        model = TimmIDModule.load_from_checkpoint(
+            ckpt_path,
+            model_name=model_name,
+        )
 
     # IMPORTANT: ensure eval mode
     model.eval()
