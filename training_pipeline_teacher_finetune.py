@@ -313,6 +313,21 @@ class TeacherFineTuneModule(L.LightningModule):
         if teacher_type == "cvlface_vit_base":
             _download_cvlface(_CVLFACE_REPO_ID, _CVLFACE_CACHE)
             self.backbone = _load_cvlface_model(_CVLFACE_CACHE)
+        elif teacher_type == "petalface_swin":
+            from lightning_modules.teacher_wrapper import (
+                _download_petalface_backbone,
+                _download_petalface_weights,
+                _load_petalface_backbone,
+                _PETALFACE_CACHE,
+            )
+            _download_petalface_backbone(_PETALFACE_CACHE)
+            _download_petalface_weights(_PETALFACE_CACHE)
+            self.backbone = _load_petalface_backbone(_PETALFACE_CACHE)
+            weights_path = os.path.join(
+                _PETALFACE_CACHE, "swin_arcface_webface4m", "model.pt"
+            )
+            state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+            self.backbone.load_state_dict(state_dict, strict=True)
         else:
             raise ValueError(f"Unknown teacher_type: {teacher_type}")
 
@@ -439,7 +454,6 @@ class TeacherCheckpointCallback(Callback):
             )
 
         torch.save({"backbone_state_dict": backbone_sd}, path)
-        )
         logger.info(f"Saved teacher backbone state_dict to {path}")
 
 
@@ -451,7 +465,7 @@ def parse_args():
     p = argparse.ArgumentParser("TinyFace Teacher Fine-Tuning")
 
     p.add_argument("--teacher_type", type=str, default="cvlface_vit_base",
-                    choices=["cvlface_vit_base"])
+                    choices=["cvlface_vit_base", "petalface_swin"])
     p.add_argument("--img_size", type=int, default=112)
     p.add_argument("--batch_size", type=int, default=8)
     p.add_argument("--max_epochs", type=int, default=50)

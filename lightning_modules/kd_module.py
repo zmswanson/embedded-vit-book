@@ -285,13 +285,14 @@ class KDTimmIDModule(L.LightningModule):
     # ------------------------------------------------------------------
     def _prepare_teacher_input(self, x: torch.Tensor) -> torch.Tensor:
         """Convert student input (96×96, ImageNet norm) to teacher input
-        (112×112, [-1, 1] norm)."""
+        (teacher_img_size×teacher_img_size, [-1, 1] norm)."""
         mean = IMAGENET_MEAN.to(x.device, x.dtype)
         std = IMAGENET_STD.to(x.device, x.dtype)
         # Undo ImageNet normalisation → [0, 1]
         x_unnorm = x * std + mean
-        # Resize to 112×112
-        x_resized = F.interpolate(x_unnorm, size=112, mode="bilinear", align_corners=False)
+        # Resize to teacher's expected size
+        teacher_size = self.teacher.img_size
+        x_resized = F.interpolate(x_unnorm, size=teacher_size, mode="bilinear", align_corners=False)
         # Apply teacher normalisation → [-1, 1]
         x_teacher = (x_resized - 0.5) / 0.5
         return x_teacher

@@ -68,7 +68,7 @@ def parse_args():
 
     # Teacher
     p.add_argument("--teacher_type", type=str, required=True,
-                    choices=["cvlface_vit_base"])
+                    choices=["cvlface_vit_base", "petalface_swin"])
     p.add_argument("--teacher_finetuned", action="store_true",
                     help="Use teacher fine-tuned on TinyFace instead of frozen pretrained")
     p.add_argument("--teacher_finetune_ckpt_path", type=str, default=None,

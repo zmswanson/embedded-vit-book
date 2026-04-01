@@ -22,11 +22,14 @@ IMAGENET_STD  = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
 
 class _NormConvertWrapper(nn.Module):
     """Wraps a teacher model so it accepts ImageNet-normalised input and
-    internally converts to [-1, 1] before forwarding."""
+    internally converts to [-1, 1] before forwarding.
+    If the eval dataloader image size differs from the teacher's expected
+    size, bilinear resize is applied automatically."""
 
-    def __init__(self, teacher: nn.Module):
+    def __init__(self, teacher: nn.Module, teacher_img_size: int = 112):
         super().__init__()
         self.teacher = teacher
+        self.teacher_img_size = teacher_img_size
         self.register_buffer("img_mean", IMAGENET_MEAN)
         self.register_buffer("img_std", IMAGENET_STD)
 
@@ -34,6 +37,9 @@ class _NormConvertWrapper(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Undo ImageNet normalisation → [0, 1]
         x = x * self.img_std + self.img_mean
+        # Resize if needed
+        if x.shape[-1] != self.teacher_img_size or x.shape[-2] != self.teacher_img_size:
+            x = F.interpolate(x, size=self.teacher_img_size, mode="bilinear", align_corners=False)
         # Apply teacher normalisation → [-1, 1]
         x = (x - 0.5) / 0.5
         return self.teacher(x)
@@ -59,7 +65,8 @@ def main():
     # Load teacher
     ft_path = args.teacher_finetune_ckpt_path if args.teacher_finetuned else None
     teacher = get_teacher(args.teacher_type, finetune_ckpt_path=ft_path)
-    model = _NormConvertWrapper(teacher).to(device).eval()
+    teacher_img_size = teacher.img_size
+    model = _NormConvertWrapper(teacher, teacher_img_size=teacher_img_size).to(device).eval()
 
     mode_str = "finetuned" if args.teacher_finetuned else "frozen"
     print(f"Evaluating {args.teacher_type} ({mode_str}) on TinyFace test set ...")

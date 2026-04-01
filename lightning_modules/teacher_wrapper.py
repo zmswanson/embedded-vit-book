@@ -29,10 +29,14 @@ class BaseTeacher(nn.Module):
     """
 
     EMB_DIM: int = 512  # all current teachers produce 512-d embeddings
+    IMG_SIZE: int = 112  # default — subclasses override as needed
 
     def __init__(self, finetune_ckpt_path: Optional[str] = None):
         super().__init__()
 
+    @property
+    def img_size(self) -> int:
+        return self.IMG_SIZE
     @torch.no_grad()
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Input: [B, 3, 112, 112] normalised to [-1, 1].
@@ -76,6 +80,146 @@ def _load_cvlface_model(path: str) -> nn.Module:
         os.chdir(cwd)
         sys.path.remove(path)
     return model
+
+
+# ---------------------------------------------------------------------------
+# PETALface Swin (ArcFace, WebFace4M)
+# ---------------------------------------------------------------------------
+_PETALFACE_REPO_ID = "kartiknarayan/PETALface"
+_PETALFACE_CACHE = os.path.expanduser("~/.petalface_cache")
+_PETALFACE_BACKBONE_URL = (
+    "https://raw.githubusercontent.com/Kartik-3004/PETALface/main/backbones"
+)
+
+# PETALface uses 120×120 input (NOT 112) — its PatchEmbed asserts this.
+PETALFACE_IMG_SIZE = 120
+
+
+def _download_petalface_backbone(cache: str) -> None:
+    """Download the PETALface backbone Python files (swin_models + lora_layers)."""
+    bb_dir = os.path.join(cache, "backbones")
+    os.makedirs(bb_dir, exist_ok=True)
+    init_path = os.path.join(bb_dir, "__init__.py")
+    if not os.path.exists(init_path):
+        with open(init_path, "w") as f:
+            f.write("")
+    for fname in ("swin_models.py", "lora_layers.py"):
+        full = os.path.join(bb_dir, fname)
+        if not os.path.exists(full):
+            import urllib.request
+            url = f"{_PETALFACE_BACKBONE_URL}/{fname}"
+            urllib.request.urlretrieve(url, full)
+
+
+def _download_petalface_weights(cache: str) -> str:
+    """Download pretrained PETALface weights from HuggingFace. Returns path."""
+    from huggingface_hub import hf_hub_download
+    return hf_hub_download(
+        repo_id=_PETALFACE_REPO_ID,
+        filename="swin_arcface_webface4m/model.pt",
+        local_dir=cache,
+    )
+
+
+def _load_petalface_backbone(cache: str):
+    """Instantiate PETALface Swin backbone (no LoRA, 120×120)."""
+    bb_dir = os.path.join(cache, "backbones")
+    if cache not in sys.path:
+        sys.path.insert(0, cache)
+    try:
+        import importlib
+        import types
+
+        # Create a synthetic package so relative imports (from .lora_layers)
+        # work inside swin_models.py.
+        _PKG = "_petalface_bb"
+        pkg = types.ModuleType(_PKG)
+        pkg.__path__ = [bb_dir]
+        pkg.__package__ = _PKG
+        sys.modules[_PKG] = pkg
+
+        # Load lora_layers as a sub-module of the package
+        lora_spec = importlib.util.spec_from_file_location(
+            f"{_PKG}.lora_layers",
+            os.path.join(bb_dir, "lora_layers.py"),
+        )
+        lora_mod = importlib.util.module_from_spec(lora_spec)
+        lora_mod.__package__ = _PKG
+        sys.modules[f"{_PKG}.lora_layers"] = lora_mod
+        lora_spec.loader.exec_module(lora_mod)
+
+        # Load swin_models as a sub-module of the same package
+        swin_spec = importlib.util.spec_from_file_location(
+            f"{_PKG}.swin_models",
+            os.path.join(bb_dir, "swin_models.py"),
+        )
+        swin_mod = importlib.util.module_from_spec(swin_spec)
+        swin_mod.__package__ = _PKG
+        sys.modules[f"{_PKG}.swin_models"] = swin_mod
+        swin_spec.loader.exec_module(swin_mod)
+
+        SwinTransformer = swin_mod.SwinTransformer
+    finally:
+        for k in list(sys.modules):
+            if k.startswith("_petalface_bb"):
+                sys.modules.pop(k, None)
+        if cache in sys.path:
+            sys.path.remove(cache)
+    return SwinTransformer(
+        lora_rank=4, lora_scale=1,
+        img_size=PETALFACE_IMG_SIZE, patch_size=6, in_chans=3, num_classes=512,
+        embed_dim=384, depths=[2, 18, 2], num_heads=[8, 16, 16],
+        window_size=5, use_lora=False, reso=PETALFACE_IMG_SIZE,
+    )
+
+
+class PETALFaceTeacher(BaseTeacher):
+    """Wraps PETALface Swin (ArcFace + WebFace4M) as a frozen teacher.
+
+    Input: ``[B, 3, 120, 120]`` normalised to ``[-1, 1]``.
+    Output: ``[B, 512]`` L2-normalised embeddings.
+
+    Note: PETALface requires **120×120** input — its PatchEmbed asserts
+    ``img_size == 120``.  This differs from CVLFace (112×112).
+    """
+
+    IMG_SIZE = PETALFACE_IMG_SIZE  # 120
+
+    def __init__(
+        self,
+        finetune_ckpt_path: Optional[str] = None,
+        cache_dir: Optional[str] = None,
+    ):
+        super().__init__(finetune_ckpt_path)
+
+        cache = cache_dir or _PETALFACE_CACHE
+        _download_petalface_backbone(cache)
+        _download_petalface_weights(cache)
+
+        self.model = _load_petalface_backbone(cache)
+
+        # Load pretrained weights
+        weights_path = os.path.join(cache, "swin_arcface_webface4m", "model.pt")
+        state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
+        self.model.load_state_dict(state_dict, strict=True)
+
+        # Apply fine-tuned weights if provided
+        if finetune_ckpt_path is not None:
+            state = torch.load(finetune_ckpt_path, map_location="cpu", weights_only=False)
+            self.model.load_state_dict(state["backbone_state_dict"])
+
+        self.model.eval()
+        for p in self.model.parameters():
+            p.requires_grad = False
+
+    @torch.no_grad()
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Input: [B, 3, 120, 120] normalised to [-1, 1].
+        Output: [B, 512] L2-normalised embeddings."""
+        emb = self.model(x)
+        if isinstance(emb, (tuple, list)):
+            emb = emb[0]
+        return F.normalize(emb, dim=1)
 
 
 class CVLFaceTeacher(BaseTeacher):
@@ -122,7 +266,7 @@ def get_teacher(
     """Factory function for teacher models.
 
     Args:
-        teacher_type: One of ``"cvlface_vit_base"``.
+        teacher_type: One of ``"cvlface_vit_base"`` or ``"petalface_swin"``.
         finetune_ckpt_path: Optional path to fine-tuned teacher checkpoint.
         **kwargs: Forwarded to the teacher constructor.
 
@@ -131,5 +275,6 @@ def get_teacher(
     """
     if teacher_type == "cvlface_vit_base":
         return CVLFaceTeacher(finetune_ckpt_path=finetune_ckpt_path, **kwargs)
-    # Phase 2.4 will add: elif teacher_type == "petalface_swin": ...
+    elif teacher_type == "petalface_swin":
+        return PETALFaceTeacher(finetune_ckpt_path=finetune_ckpt_path, **kwargs)
     raise ValueError(f"Unknown teacher_type: {teacher_type}")
