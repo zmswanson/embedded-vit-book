@@ -1,6 +1,7 @@
 datasets/tinyface_path.txt
 model.onnx*
 model.plan
+onnx_models/
 __pycache__/
 wandb/
 tinyface-timm/
