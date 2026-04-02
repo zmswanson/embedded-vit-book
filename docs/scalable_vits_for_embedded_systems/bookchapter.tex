@@ -22,10 +22,13 @@
 
 
 \usepackage{graphicx}
+\usepackage{gensymb}
 \graphicspath{ {images/} }
 
 
 \usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{multirow}
 \newcolumntype{C}{>{\centering\arraybackslash}X}
 
 
@@ -234,7 +237,10 @@ All TinyFace images were resized to a fixed spatial resolution of $96\times96$ p
 
 From a transformer perspective, a $96\times96$ input resolution provides a sufficient number of patch tokens to enable effective self-attention while keeping computational cost manageable. For example, with a patch size of $16\times16$, this resolution yields $6\times6=36$ tokens, striking a balance between spatial expressiveness and efficiency. This choice also aligns with embedded deployment goals, where minimizing token count directly reduces attention complexity and memory usage.
 
-\subsection{Training Protocol and Hyperparameter Selection}
+Training augmentations included random horizontal flips, random rotation ($\pm 15\degree$), color jitter (brightness, contrast, saturation, and hue), and random affine translations ($\pm 10\%$). All images were normalized using ImageNet statistics (mean $=[0.485, 0.456, 0.406]$, std $=[0.229, 0.224, 0.225]$). Evaluation used only resizing and normalization without augmentations.
+
+\subsection{Model Architectures and Configurations}
+Six architecture families were evaluated, spanning pure transformers (DeiT-3, Swin, PVT-v2), hybrid models (MobileViT-v2), modernized CNNs (ConvNeXt), and classical CNNs (ResNet). Table~\ref{tab:arch-specs} summarizes the model variants and their parameter counts.
 
 \begin{table}[]
     \centering
@@ -246,25 +252,214 @@ From a transformer perspective, a $96\times96$ input resolution provides a suffi
          MobileViT &   -  & &   -  & & 17.4 & \\
          PVT       & 81.4 & & 44.7 & & 24.8 & \\
          ResNet    & 62.6 & & 42.5 & & 23.5 & \\
-         Swin      & 86.7 & & 48.8 & & 27.5 & \\ \hline         
+         Swin      & 86.7 & & 48.8 & & 27.5 & \\ \hline
     \end{tabularx}
-    \caption{Caption}
+    \caption{Architecture variants evaluated in this study with approximate parameter counts (millions). All models use ImageNet-1k pretrained weights from the \texttt{timm} library.}
     \label{tab:arch-specs}
 \end{table}
 
-Prior to final training runs, hyperparameter sweeps were conducted to identify stable and effective configurations for each model family. These sweeps explored learning rate, batch size, optimizer parameters, and regularization settings, with the goal of identifying hyperparameter regions that produced consistent convergence rather than single-point optima.
+All models were initialized from ImageNet-1k pretrained checkpoints provided by the \texttt{timm} library and adapted to the TinyFace classification task by replacing the classification head. Two training modes were investigated for each architecture: (1) \emph{baseline} training, in which all backbone parameters are updated, and (2) \emph{LoRA} fine-tuning, in which the backbone is frozen and only low-rank adaptation matrices are trained.
 
-Following hyperparameter selection, all models were trained for a fixed duration of 50 epochs on the TinyFace training split. Training was performed offline on GPU hardware, and all models were evaluated using a standard gallery–probe protocol, consistent with common practice in face recognition. In this setup, a gallery set containing one or more reference images per identity is used for enrollment, and probe images are matched against the gallery to assess recognition performance. Rank-based identification metrics were used to quantify accuracy.
+\subsection{Training Protocol}\label{sec:training-protocol}
+Prior to final training runs, Bayesian hyperparameter sweeps were conducted to identify stable and effective configurations for each model family. These sweeps explored learning rate, weight decay, head margin, and LoRA-specific parameters (rank, alpha, dropout), with the goal of identifying hyperparameter regions that produced consistent convergence.
 
-\subsection{Model Selection and Optimization Studies}
-Based on initial training results, the top-performing architectures were selected for further investigation. These models were used to study the effects of various optimization and compression techniques, including parameter-efficient fine-tuning via LoRA, knowledge distillation, post-training quantization, and structured pruning. Each technique was evaluated in isolation and, where appropriate, in combination to assess its impact on both recognition accuracy and computational efficiency.
+\paragraph{Baseline Training.}
+For baseline experiments, all backbone parameters were trainable. Models were trained for 100 epochs using the AdamW optimizer with a cosine annealing learning rate schedule. Batch sizes of 512 were used with mixed-precision (FP16) training. The AdaFace~\cite{narayan2025petalface} angular margin head was used for all models, with margin and scale parameters tuned per family via the hyperparameter sweeps. The overall training loss is the cross-entropy between the margin-scaled logits and the identity labels.
 
-\subsection{Embedded Deployment and Performance Evaluation}
-To evaluate real-world deployability, all selected models were benchmarked on an NVIDIA Jetson Orin Nano embedded platform. Computational performance metrics included inference latency, throughput, and memory usage, measured under realistic deployment conditions. By pairing biometric evaluation with on-device performance measurements, the experimental setup enables a holistic assessment of accuracy–efficiency trade-offs and provides practical guidance for deploying vision transformers on embedded systems.
+\paragraph{LoRA Fine-Tuning.}
+For LoRA experiments, the pretrained backbone was frozen and low-rank adaptation matrices were injected into the query, key, value, and output projection layers of each attention block. Following Hu et al.~\cite{hu2022lora}, the LoRA update is
+\[
+W' = W + \frac{\alpha}{r} \cdot BA,
+\]
+where $A \in \mathbb{R}^{d \times r}$ and $B \in \mathbb{R}^{r \times d}$ are trainable low-rank factors, $r$ is the rank, and $\alpha$ is a scaling coefficient. Typical swept values were $r \in \{4, 8, 16, 24, 32\}$ and $\alpha \in \{16, 24, 32, 96, 120\}$. LoRA models were trained for 50 epochs with a batch size of 8, a cosine schedule with 8 warmup epochs, and gradual unfreezing of backbone stages every 5 epochs. The learning rate floor was set to $0.1\%$ of the peak value.
 
-Overall, this experimental framework is designed to systematically evaluate how architectural choices and optimization strategies affect both recognition performance and embedded feasibility when operating on extremely low-resolution visual data.
+\subsection{Knowledge Distillation Setup}\label{sec:kd-setup}
+To evaluate the impact of knowledge distillation on student model performance, a feature-level distillation framework was implemented. The combined training loss is defined as
+\begin{equation}\label{eq:kd-loss}
+    \mathcal{L} = \alpha \cdot \mathcal{L}_{\text{CE}}(\text{logits}, y) + (1 - \alpha) \cdot \mathcal{L}_{\text{KD}},
+\end{equation}
+where $\mathcal{L}_{\text{CE}}$ is the standard cross-entropy loss with the AdaFace head, $\mathcal{L}_{\text{KD}}$ is the cosine embedding loss between L2-normalized teacher and student feature vectors, and $\alpha \in [0, 1]$ controls the relative weighting. A trainable linear projection layer maps the student embedding dimension to the teacher's 512-dimensional space when dimensions differ.
+
+Two teacher models, both pretrained on the large-scale WebFace4M dataset, were evaluated:
+\begin{itemize}
+    \item \textbf{CVLFace}: A ViT-Base model with AdaFace head (114.9M parameters), accepting $112\times112$ inputs and producing 512-dimensional L2-normalized embeddings. This represents a cross-architecture teacher (ViT $\rightarrow$ Swin/DeiT student).
+    \item \textbf{PETALface}: A custom 3-stage Swin Transformer with ArcFace head (213.8M parameters), accepting $120\times120$ inputs and producing 512-dimensional L2-normalized embeddings~\cite{narayan2025petalface}. This represents a same-architecture teacher for Swin students.
+\end{itemize}
+Critically, both teachers are substantially larger than the student models evaluated in this study (17.4M--87.6M parameters), and their high accuracy stems in part from pretraining on WebFace4M (4.2 million identities), which is orders of magnitude larger than TinyFace. These factors---large model size, high input resolution ($112\times112$ or $120\times120$ vs.\ the student's $96\times96$), and extensive pretraining data---make the teachers impractical for direct deployment on embedded platforms. Knowledge distillation therefore serves as the mechanism to transfer the teachers' representational capacity to smaller, deployable student architectures.
+
+Each teacher was evaluated in two modes: \emph{frozen} (original pretrained weights) and \emph{fine-tuned} (adapted to TinyFace before serving as teacher). During KD training, student images ($96\times96$, ImageNet-normalized) are un-normalized, resized to the teacher's input resolution, and re-normalized to $[-1, 1]$ before being passed to the teacher. The default distillation weight was $\alpha = 0.7$; an ablation study across $\alpha \in \{0.0, 0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0\}$ was conducted to identify optimal mixing ratios.
+
+KD student models were trained with the same protocol as LoRA models: 50 epochs, batch size 8, cosine schedule with warmup, and AdamW optimizer. Both baseline (all parameters trainable) and LoRA training modes were evaluated with each teacher configuration.
+
+\subsection{Evaluation Methodology}
+All models were evaluated using the standard TinyFace gallery--probe protocol. Probe images are matched against a gallery of enrolled identities using cosine similarity of the extracted embeddings. The primary evaluation metrics include:
+\begin{itemize}
+    \item \textbf{Rank-$k$ identification rate}: The fraction of probe images for which the correct identity appears within the top $k$ gallery matches, reported for $k = 1$ through $10$.
+    \item \textbf{Mean average precision (mAP)}: The mean of per-query average precision scores across all probe images.
+    \item \textbf{Area under the curve (AUC)}: The area under the receiver operating characteristic (ROC) curve.
+\end{itemize}
+Rank-1 identification rate is used as the primary metric for model selection and comparison, as it directly reflects the practical accuracy of a single-shot identification system. All experiments used a fixed random seed of 73 for reproducibility.
 
 \section{Performance Analysis}\label{sec:performance}
+This section presents the experimental results across four phases of evaluation: (1) baseline architecture comparison, (2) parameter-efficient fine-tuning via LoRA, (3) knowledge distillation with multiple teacher configurations, and (4) an ablation study on the distillation loss mixing coefficient. Results are analyzed through the lens of both recognition accuracy and model efficiency to inform deployment decisions for embedded systems.
+
+\subsection{Baseline Architecture Comparison}
+Sixteen model variants spanning six architecture families were trained on TinyFace using the baseline protocol described in Section~\ref{sec:training-protocol}. Figure~\ref{fig:baseline-comparison} presents the rank-1 identification rates, and Figure~\ref{fig:params-vs-accuracy} shows the relationship between model size and accuracy.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1.0\linewidth]{baseline_comparison.pdf}
+    \caption{Rank-1 identification rate on the TinyFace test set for all 16 baseline model variants, sorted by performance. On this low-resolution dataset, vision transformers (DeiT-3, Swin) outperform CNNs (ResNet, ConvNeXt) and hybrid architectures.}
+    \label{fig:baseline-comparison}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.85\linewidth]{params_vs_accuracy.pdf}
+    \caption{Model parameter count versus rank-1 identification rate. Student models (circles) range from 17.4M to 87.6M parameters, while teacher models (stars) used for knowledge distillation are substantially larger (CVLFace 114.9M, PETALface 213.8M). The teachers' size and input resolution requirements make them impractical for embedded deployment, motivating the distillation approach studied in Section~\ref{sec:kd-setup}.}
+    \label{fig:params-vs-accuracy}
+\end{figure}
+
+Several key observations emerge from the baseline comparison. First, \textbf{vision transformers outperform CNNs on this low-resolution task}. DeiT3-Base achieves the highest rank-1 rate of 0.583, followed by DeiT3-Medium (0.570) and Swin-Tiny (0.562). By contrast, all three ResNet variants rank at the bottom, with ResNet-200 (0.468) performing worst despite having 62.6M parameters. One possible explanation is that the global attention mechanism of transformers provides a substantial advantage when discriminative information must be extracted from severely limited spatial resolution, as is the case with TinyFace's $30\times30$ average native resolution.
+
+Second, \textbf{larger models within a family do not always perform better}. Swin-Tiny (27.5M parameters, rank-1 = 0.562) outperforms Swin-Base (86.7M, 0.550), and DeiT3-Medium (38.3M, 0.570) performs comparably to DeiT3-Base (85.8M, 0.583) despite having fewer than half the parameters. For ResNets, scaling from 50 to 200 layers actually \emph{decreases} performance (0.476 $\rightarrow$ 0.468), indicating that additional capacity cannot compensate for the architectural limitations of purely local feature extraction on extremely low-resolution inputs. This inverse scaling behavior is particularly relevant for embedded deployment: smaller transformer variants achieve better accuracy \emph{and} lower computational cost.
+
+Third, ConvNeXt models, despite incorporating many transformer-inspired design principles, perform only slightly above their ResNet counterparts and substantially below DeiT-3 and Swin models. ConvNeXt-Base (87.6M) achieves 0.543, which is lower than Swin-Tiny with one-third the parameters. This suggests that, at least for the extremely low-resolution inputs characteristic of TinyFace, explicit self-attention---not merely large receptive fields or modern training practices---may be an important factor in achieving strong recognition performance.
+
+Figure~\ref{fig:params-vs-accuracy} also plots the teacher models used in subsequent knowledge distillation experiments (Section~\ref{sec:kd-setup}). The CVLFace ViT-Base teacher (114.9M parameters) achieves rank-1 rates of 0.716 (frozen) and 0.781 (fine-tuned), while the PETALface Swin teacher (213.8M parameters) achieves 0.424 (frozen) and 0.663 (fine-tuned). Although the teachers offer substantially higher accuracy---particularly after fine-tuning on TinyFace---their parameter counts of 114.9M and 213.8M exceed the largest student models by 30--150\%, placing them well outside the feasible range for embedded deployment. This performance--size gap motivates the use of knowledge distillation to transfer teacher-level representational capacity to compact student architectures.
+
+\subsection{Parameter-Efficient Fine-Tuning with LoRA}
+Following the baseline comparison, the top-performing architecture families (Swin and DeiT-3) were fine-tuned using LoRA as described in Section~\ref{sec:training-protocol}. Figure~\ref{fig:baseline-vs-lora} compares baseline and LoRA results, and Figure~\ref{fig:cmc-curves} presents CMC curves for selected top models alongside a ResNet-50 reference.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{baseline_vs_lora.pdf}
+    \caption{Comparison of baseline (full fine-tuning) and LoRA fine-tuning across Swin and DeiT-3 model variants. LoRA improves Swin models but degrades DeiT-3 performance, revealing an architecture-dependent response to parameter-efficient adaptation.}
+    \label{fig:baseline-vs-lora}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.85\linewidth]{cmc_curves.pdf}
+    \caption{Cumulative match characteristic (CMC) curves for the top-performing models compared to a ResNet-50 baseline. DeiT3-Base with LoRA achieves the highest identification rates across all ranks.}
+    \label{fig:cmc-curves}
+\end{figure}
+
+The LoRA results reveal a striking \textbf{architecture-dependent response} to parameter-efficient fine-tuning. For Swin models, LoRA consistently improves accuracy over the baseline: Swin-Tiny improves from 0.534 to 0.562 ($+5.2\%$), Swin-Small from 0.539 to 0.554 ($+2.8\%$), and Swin-Base from 0.526 to 0.536 ($+1.9\%$). In contrast, DeiT-3 models exhibit the opposite trend: LoRA \emph{degrades} performance for DeiT3-Small (0.552 $\rightarrow$ 0.527, $-4.5\%$), DeiT3-Medium (0.570 $\rightarrow$ 0.533, $-6.5\%$), and DeiT3-Base (0.583 $\rightarrow$ 0.550, $-5.7\%$).
+
+This divergence may be attributed to architectural differences in how Swin and DeiT-3 process information. Swin Transformer's hierarchical structure with local window attention may benefit from the regularization effect of LoRA's low-rank constraint, which prevents overfitting while still adapting attention patterns. DeiT-3's columnar architecture with global attention across all layers may already be well-adapted to the task via full fine-tuning, and constraining updates to a low-rank subspace may limit its ability to make the necessary adjustments to its global attention patterns for this domain.
+
+The CMC curves in Figure~\ref{fig:cmc-curves} further illustrate these dynamics. DeiT3-Base with LoRA achieves the highest cumulative identification rates, surpassing even the DeiT3-Base baseline at higher ranks ($k \geq 2$). Both DeiT3-Base configurations substantially outperform the ResNet-50 baseline, which lags by approximately 10 percentage points at rank-1. The consistent gap between transformer and CNN models across all ranks confirms that the advantage of self-attention generalizes beyond rank-1 accuracy.
+
+\subsection{Knowledge Distillation Results}
+
+Knowledge distillation experiments were conducted for all Swin and DeiT-3 student models using both CVLFace and PETALface teachers in frozen and fine-tuned modes. Table~\ref{tab:kd-results} summarizes the key results.
+
+\begin{table}[t]
+    \centering
+    \caption{Knowledge distillation results (rank-1) compared to standalone training. Best Phase 1 refers to the better of baseline or LoRA for each model. The best KD result across all teacher configurations is shown. $\Delta$ indicates the change from best Phase 1 to best KD. Default $\alpha = 0.7$.}
+    \label{tab:kd-results}
+    \begin{tabular}{l c c l c}
+        \toprule
+        Model & Phase 1 & Best KD & Best Config & $\Delta$ \\
+        \midrule
+        Swin-T   & 0.562 & 0.567 & PETALface frozen, LoRA  & $+$0.005 \\
+        Swin-S   & 0.554 & 0.559 & CVLFace FT, LoRA        & $+$0.004 \\
+        Swin-B   & 0.536 & 0.536 & CVLFace FT, Direct      & $+$0.000 \\
+        DeiT3-S  & 0.552 & 0.543 & CVLFace frozen, Direct  & $-$0.009 \\
+        DeiT3-M  & 0.570 & 0.559 & CVLFace FT, Direct      & $-$0.011 \\
+        DeiT3-B  & 0.583 & 0.581 & CVLFace FT, Direct      & $-$0.003 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Several findings emerge from the distillation study. First, KD with the default $\alpha = 0.7$ provides \textbf{only marginal improvements for Swin students} ($+$0.000 to $+$0.005 rank-1) and \textbf{slight degradation for DeiT-3 students} ($-$0.003 to $-$0.011). The higher-accuracy teacher (CVLFace ViT-Base, rank-1 = 0.716 frozen, 0.781 fine-tuned) does not translate its substantial performance advantage to student accuracy at this default mixing ratio. This suggests that, on this dataset, the bottleneck may lie in the student's capacity to extract discriminative features from the limited $96\times96$ input rather than in the quality of the supervisory signal.
+
+Second, \textbf{teacher fine-tuning does not reliably improve student performance}. Fine-tuning dramatically improves the teacher's own accuracy (CVLFace: $0.716 \rightarrow 0.781$; PETALface: $0.424 \rightarrow 0.663$), but the resulting KD students perform inconsistently---sometimes better, sometimes worse than those trained with frozen teachers. This finding challenges the common assumption that a stronger teacher necessarily produces a stronger student.
+
+Third, the \textbf{teacher architecture matters but not in the expected direction}. Despite the PETALface teacher achieving substantially lower accuracy on TinyFace (rank-1 = 0.424 frozen vs.\ CVLFace's 0.716), PETALface occasionally produces competitive students, particularly for Swin-Tiny with LoRA (rank-1 = 0.567). This may reflect a benefit from same-architecture inductive bias (Swin teacher $\rightarrow$ Swin student) over cross-architecture transfer (ViT teacher $\rightarrow$ Swin student), or it may indicate that the PETALface teacher's lower TinyFace accuracy does not fully capture the usefulness of its intermediate feature representations for guiding student training.
+
+Finally, a \textbf{Swin LoRA collapse} was observed: Swin-Small and Swin-Base with LoRA + KD consistently degraded to rank-1 values of 0.35--0.41 across both teacher types, indicating a systematic instability when combining LoRA's gradual unfreezing with KD supervision for larger Swin models. Only Swin-Tiny escaped this collapse.
+
+\subsection{Distillation Loss Mixing Ablation}
+
+The default mixing coefficient $\alpha = 0.7$ was selected based on common practice~\cite{hinton2015distillation}; however, the modest KD gains in the previous section motivated a systematic ablation. Four representative configurations were swept across $\alpha \in \{0.0, 0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0\}$, where $\alpha = 0.0$ corresponds to pure KD loss and $\alpha = 1.0$ to pure cross-entropy (no distillation). Figure~\ref{fig:alpha-ablation} presents the results, and Table~\ref{tab:alpha-optimal} summarizes the optimal configurations.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{alpha_ablation.pdf}
+    \caption{Effect of the distillation loss mixing coefficient $\alpha$ on rank-1 identification rate across four student--teacher configurations. The default $\alpha = 0.7$ is suboptimal for all configurations; lower values favoring the KD loss produce the best results.}
+    \label{fig:alpha-ablation}
+\end{figure}
+
+\begin{table}[t]
+    \centering
+    \caption{Optimal distillation mixing coefficient $\alpha$ for each configuration. In all cases, the commonly used $\alpha = 0.7$ is suboptimal. The rightmost column shows the improvement from tuning $\alpha$.}
+    \label{tab:alpha-optimal}
+    \begin{tabular}{l l l c c c c}
+        \toprule
+        & Student & Teacher & Opt.\ $\alpha$ & rank-1 & rank-1 ($\alpha{=}0.7$) & $\Delta$ \\
+        \midrule
+        A & Swin-T Direct  & CVLFace frozen   & 0.0 & 0.616 & 0.549 & $+$0.067 \\
+        B & Swin-T LoRA    & PETALface frozen & 0.1 & 0.581 & 0.567 & $+$0.014 \\
+        C & DeiT3-B Direct & CVLFace FT       & 0.1 & 0.593 & 0.581 & $+$0.013 \\
+        D & DeiT3-B Direct & PETALface frozen & 0.1 & 0.586 & 0.576 & $+$0.010 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The ablation reveals several important findings. Most significantly, \textbf{$\alpha = 0.7$ is suboptimal for all four configurations}. The optimal values are $\alpha = 0.0$ (Config A) and $\alpha = 0.1$ (Configs B, C, D), indicating that heavily weighting the feature-level KD loss over the hard classification loss is beneficial. This is particularly striking for Config A (Swin-Tiny + CVLFace frozen), where pure KD ($\alpha = 0.0$) achieves rank-1 = 0.616---an improvement of $+$0.067 over $\alpha = 0.7$ and $+$0.054 over the best non-KD result (Swin-Tiny LoRA, 0.562). This represents the single best student result in the entire study.
+
+The behavior at $\alpha = 0.0$ (pure KD) is teacher-dependent. With CVLFace---which achieves higher accuracy on TinyFace---pure KD achieves the best result (0.616); with PETALface---which is less well-adapted to this dataset in the frozen setting---pure KD collapses to 0.416--0.450, performing worse than no KD at all. This indicates that, \textbf{on this task, a teacher with high task-specific accuracy appears necessary for pure feature-level distillation to succeed}. Whether this finding generalizes to other datasets and teacher--student pairings remains an open question.
+
+For the mid-range $\alpha$ values (0.1--0.9), performance is remarkably stable, with spreads of only 0.013--0.022 rank-1 across all non-extreme values. This robustness suggests that once a small amount of classification loss is present to anchor training, the exact mixing ratio matters less than whether distillation is included at all.
+
+Figure~\ref{fig:kd-overview} summarizes the overall impact of knowledge distillation, comparing each model's best standalone result, best KD result with the default $\alpha = 0.7$, and best KD result with tuned $\alpha$.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{kd_overview.pdf}
+    \caption{Knowledge distillation impact: comparison of best standalone training, best KD with default $\alpha = 0.7$, and best KD with optimally tuned $\alpha$. Alpha tuning produces substantial improvements for Swin-T and DeiT3-B.}
+    \label{fig:kd-overview}
+\end{figure}
+
+\subsection{Summary and Implications for Embedded Deployment}
+
+Table~\ref{tab:overall-summary} consolidates the best results across all experimental phases.
+
+\begin{table}[t]
+    \centering
+    \caption{Overall best results across all experimental phases. The best student result (Swin-T + KD, $\alpha{=}0.0$) achieves 0.616 rank-1 with 27.5M parameters, compared to the CVLFace teacher's 0.716 with 114.9M parameters.}
+    \label{tab:overall-summary}
+    \begin{tabular}{l l c c c}
+        \toprule
+        Model & Method & Params & rank-1 & mAP \\
+        \midrule
+        CVLFace teacher (frozen) & Reference & 114.9\,M & 0.716 & 0.664 \\
+        CVLFace teacher (FT)     & Reference & 114.9\,M & 0.781 & 0.744 \\
+        \midrule
+        Swin-T   & KD ($\alpha{=}0.0$, CVLFace frozen) & 27.5\,M & \textbf{0.616} & 0.664 \\
+        DeiT3-B  & KD ($\alpha{=}0.1$, CVLFace FT) & 85.8\,M & 0.593 & 0.646 \\
+        DeiT3-B  & Baseline                         & 85.8\,M & 0.583 & 0.639 \\
+        DeiT3-M  & Baseline                         & 38.3\,M & 0.570 & 0.625 \\
+        Swin-T   & LoRA                             & 27.5\,M & 0.562 & 0.619 \\
+        \midrule
+        ResNet-50 & Baseline                        & 23.5\,M & 0.476 & 0.542 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The experimental findings carry several implications for embedded vision transformer deployment:
+
+\begin{enumerate}
+    \item \textbf{On low-resolution inputs, compact transformers outperform large CNNs.} Swin-Tiny (27.5M) outperforms ResNet-200 (62.6M) by a margin of $+$0.094 rank-1 in the baseline setting, and by $+$0.148 with optimized KD. On TinyFace, where input resolution is severely limited, transformers offer a favorable accuracy--efficiency trade-off. This advantage may be partly attributable to the global receptive field of self-attention, which allows transformers to exploit the limited spatial information more effectively than local convolutions; however, the relative benefit may differ on higher-resolution or non-biometric tasks.
+
+    \item \textbf{LoRA effectiveness appears architecture-dependent.} On TinyFace, LoRA improved all Swin (hierarchical, local-window attention) variants while degrading all DeiT-3 (columnar, global attention) variants. While the hierarchical structure of Swin may benefit from LoRA's regularizing low-rank constraint, DeiT-3's global attention layers may require higher-rank updates to adapt effectively to this domain. These results suggest that deployment engineers should evaluate PET methods on a per-architecture basis rather than applying them uniformly, and that the interaction between LoRA and architecture type warrants further investigation across additional tasks and datasets.
+
+    \item \textbf{Knowledge distillation requires careful tuning of the loss mixing coefficient.} The commonly used $\alpha = 0.7$ leaves significant performance on the table; with proper tuning, KD can boost Swin-Tiny from 0.534 (baseline) to 0.616 ($+$15.4\% relative improvement), making it competitive with models three times its size.
+
+    \item \textbf{Teacher accuracy on the target task interacts non-trivially with the mixing coefficient.} In our experiments, the higher-accuracy CVLFace teacher enabled pure feature distillation ($\alpha = 0.0$), while the lower-accuracy frozen PETALface teacher required hard loss anchoring ($\alpha \geq 0.1$) to prevent training collapse. This pattern suggests that practitioners should validate KD configurations end-to-end rather than relying on teacher accuracy as a proxy for student improvement, and that the optimal $\alpha$ may need to be re-tuned when changing teachers or target datasets.
+\end{enumerate}
 
 \section{Conclusion}
 
