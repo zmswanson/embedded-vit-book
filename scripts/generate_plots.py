@@ -11,12 +11,12 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "scalable_vits_f
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "inference_results")
 
 plt.rcParams.update({
-    "font.size": 9,
-    "axes.titlesize": 10,
-    "axes.labelsize": 9,
-    "xtick.labelsize": 8,
-    "ytick.labelsize": 8,
-    "legend.fontsize": 7.5,
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.labelsize": 12,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.fontsize": 9,
     "figure.dpi": 300,
     "savefig.dpi": 300,
     "savefig.bbox": "tight",
@@ -198,9 +198,10 @@ def plot_alpha_ablation():
 
     ax.set_xlabel(r"$\alpha$ (Hard Loss Weight)")
     ax.set_ylabel("Rank-1 Identification Rate")
-    ax.set_title(r"KD Loss Mixing ($\alpha$) Ablation")
+    ax.set_title(r"KD Loss Mixing ($\alpha$) Ablation", pad=40)
     ax.set_xticks(alphas)
-    ax.legend(fontsize=7, loc="lower left")
+    ax.legend(fontsize=8, loc="center", bbox_to_anchor=(0.5, 1.07),
+              ncol=2, frameon=True, fancybox=False, edgecolor="0.8")
     ax.grid(alpha=0.3)
     ax.set_ylim(0.39, 0.63)
     fig.savefig(os.path.join(OUT_DIR, "alpha_ablation.pdf"))
@@ -240,8 +241,9 @@ def plot_kd_overview():
     ax.set_xticklabels(models)
     ax.set_ylabel("Rank-1 Identification Rate")
     ax.set_ylim(0.50, 0.65)
-    ax.set_title("Knowledge Distillation Impact on Student Models")
-    ax.legend(fontsize=7.5)
+    ax.set_title("Knowledge Distillation Impact on Student Models", pad=30)
+    ax.legend(fontsize=9, loc="center", bbox_to_anchor=(0.5, 1.05),
+              ncol=3, frameon=True, fancybox=False, edgecolor="0.8")
     ax.grid(axis="y", alpha=0.3)
 
     fig.savefig(os.path.join(OUT_DIR, "kd_overview.pdf"))
@@ -287,10 +289,14 @@ def plot_params_vs_accuracy():
     for label, (params, rank1) in teacher_data.items():
         ax.scatter(params, rank1, c="purple", s=80, zorder=6, marker="*",
                    edgecolors="white", linewidths=0.5)
-        # Place PETALface (frozen) label above point since it's near bottom
-        offset = (5, 8) if "frozen" in label and "PETALface" in label else (5, 5)
-        ax.annotate(label, (params, rank1), textcoords="offset points",
-                    xytext=offset, fontsize=6, color="purple")
+        if "PETALface" in label:
+            ax.annotate(label, (params, rank1), textcoords="offset points",
+                        xytext=(-8, 0), fontsize=9, color="purple",
+                        fontweight="bold", ha="right", va="center")
+        else:
+            ax.annotate(label, (params, rank1), textcoords="offset points",
+                        xytext=(8, 0), fontsize=9, color="purple",
+                        fontweight="bold", ha="left", va="center")
 
     ax.set_xlabel("Parameters (M)")
     ax.set_ylabel("Rank-1 Identification Rate")
@@ -302,7 +308,7 @@ def plot_params_vs_accuracy():
     handles = [Patch(facecolor=c, label=f) for f, c in FAMILY_COLORS.items()]
     handles.append(Line2D([0], [0], marker="*", color="w", markerfacecolor="purple",
                           markersize=10, label="Teacher"))
-    ax.legend(handles=handles, loc="upper left", fontsize=7)
+    ax.legend(handles=handles, loc="upper left", fontsize=9)
     fig.savefig(os.path.join(OUT_DIR, "params_vs_accuracy.pdf"))
     fig.savefig(os.path.join(OUT_DIR, "params_vs_accuracy.png"))
     plt.close(fig)
@@ -366,9 +372,10 @@ def plot_cmc_curves():
 
     ax.set_xlabel("Rank")
     ax.set_ylabel("Identification Rate")
-    ax.set_title("CMC Curves — Top Models on TinyFace")
+    ax.set_title("CMC Curves \u2014 Top Models on TinyFace", pad=45)
     ax.set_xticks(ranks)
-    ax.legend(fontsize=7)
+    ax.legend(fontsize=9, loc="center", bbox_to_anchor=(0.5, 1.08),
+              ncol=3, frameon=True, fancybox=False, edgecolor="0.8")
     ax.grid(alpha=0.3)
     fig.savefig(os.path.join(OUT_DIR, "cmc_curves.pdf"))
     fig.savefig(os.path.join(OUT_DIR, "cmc_curves.png"))

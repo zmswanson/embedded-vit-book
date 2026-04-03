@@ -29,6 +29,7 @@
 \usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{xcolor}
 \newcolumntype{C}{>{\centering\arraybackslash}X}
 
 
@@ -342,7 +343,7 @@ Sixteen model variants spanning six architecture families were trained on TinyFa
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.85\linewidth]{params_vs_accuracy.pdf}
+    \includegraphics[width=\linewidth]{params_vs_accuracy.pdf}
     \caption{Model parameter count versus rank-1 identification rate. Student models (circles) range from 17.4M to 87.6M parameters, while teacher models (stars) used for knowledge distillation are substantially larger (CVLFace 114.9M, PETALface 213.8M). The teachers' size and input resolution requirements make them impractical for embedded deployment, motivating the distillation approach studied in Section~\ref{sec:kd-setup}.}
     \label{fig:params-vs-accuracy}
 \end{figure}
@@ -360,14 +361,14 @@ Following the baseline comparison, the top-performing architecture families (Swi
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.9\linewidth]{baseline_vs_lora.pdf}
+    \includegraphics[width=\linewidth]{baseline_vs_lora.pdf}
     \caption{Comparison of baseline (full fine-tuning) and LoRA fine-tuning across Swin and DeiT-3 model variants. LoRA improves Swin models but degrades DeiT-3 performance, revealing an architecture-dependent response to parameter-efficient adaptation.}
     \label{fig:baseline-vs-lora}
 \end{figure}
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.85\linewidth]{cmc_curves.pdf}
+    \includegraphics[width=\linewidth]{cmc_curves.pdf}
     \caption{Cumulative match characteristic (CMC) curves for the top-performing models compared to a ResNet-50 baseline. DeiT3-Base with LoRA achieves the highest identification rates across all ranks.}
     \label{fig:cmc-curves}
 \end{figure}
@@ -386,7 +387,7 @@ Knowledge distillation experiments were conducted for all Swin and DeiT-3 studen
     \centering
     \caption{Knowledge distillation results (rank-1) compared to standalone training. Best Phase 1 refers to the better of baseline or LoRA for each model. The best KD result across all teacher configurations is shown. $\Delta$ indicates the change from best Phase 1 to best KD. Default $\alpha = 0.7$.}
     \label{tab:kd-results}
-    \begin{tabular}{l c c l c}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c l c}
         \toprule
         Model & Phase 1 & Best KD & Best Config & $\Delta$ \\
         \midrule
@@ -397,7 +398,7 @@ Knowledge distillation experiments were conducted for all Swin and DeiT-3 studen
         DeiT3-M  & 0.570 & 0.559 & CVLFace FT, Direct      & $-$0.011 \\
         DeiT3-B  & 0.583 & 0.581 & CVLFace FT, Direct      & $-$0.003 \\
         \bottomrule
-    \end{tabular}
+    \end{tabular*}
 \end{table}
 
 Several findings emerge from the distillation study. First, KD with the default $\alpha = 0.7$ provides \textbf{only marginal improvements for Swin students} ($+$0.000 to $+$0.005 rank-1) and \textbf{slight degradation for DeiT-3 students} ($-$0.003 to $-$0.011). The higher-accuracy teacher (CVLFace ViT-Base, rank-1 = 0.716 frozen, 0.781 fine-tuned) does not translate its substantial performance advantage to student accuracy at this default mixing ratio. This suggests that, on this dataset, the bottleneck may lie in the student's capacity to extract discriminative features from the limited $96\times96$ input rather than in the quality of the supervisory signal.
@@ -414,7 +415,7 @@ The default mixing coefficient $\alpha = 0.7$ was selected based on common pract
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.9\linewidth]{alpha_ablation.pdf}
+    \includegraphics[width=\linewidth]{alpha_ablation.pdf}
     \caption{Effect of the distillation loss mixing coefficient $\alpha$ on rank-1 identification rate across four student--teacher configurations. The default $\alpha = 0.7$ is suboptimal for all configurations; lower values favoring the KD loss produce the best results.}
     \label{fig:alpha-ablation}
 \end{figure}
@@ -423,7 +424,7 @@ The default mixing coefficient $\alpha = 0.7$ was selected based on common pract
     \centering
     \caption{Optimal distillation mixing coefficient $\alpha$ for each configuration. In all cases, the commonly used $\alpha = 0.7$ is suboptimal. The rightmost column shows the improvement from tuning $\alpha$.}
     \label{tab:alpha-optimal}
-    \begin{tabular}{l l l c c c c}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l l c c c c}
         \toprule
         & Student & Teacher & Opt.\ $\alpha$ & rank-1 & rank-1 ($\alpha{=}0.7$) & $\Delta$ \\
         \midrule
@@ -432,7 +433,7 @@ The default mixing coefficient $\alpha = 0.7$ was selected based on common pract
         C & DeiT3-B Direct & CVLFace FT       & 0.1 & 0.593 & 0.581 & $+$0.013 \\
         D & DeiT3-B Direct & PETALface frozen & 0.1 & 0.586 & 0.576 & $+$0.010 \\
         \bottomrule
-    \end{tabular}
+    \end{tabular*}
 \end{table}
 
 The ablation reveals several important findings. Most significantly, \textbf{$\alpha = 0.7$ is suboptimal for all four configurations}. The optimal values are $\alpha = 0.0$ (Config A) and $\alpha = 0.1$ (Configs B, C, D), indicating that heavily weighting the feature-level KD loss over the hard classification loss is beneficial. This is particularly striking for Config A (Swin-Tiny + CVLFace frozen), where pure KD ($\alpha = 0.0$) achieves rank-1 = 0.616---an improvement of $+$0.067 over $\alpha = 0.7$ and $+$0.054 over the best non-KD result (Swin-Tiny LoRA, 0.562). This represents the single best student result in the entire study.
@@ -445,7 +446,7 @@ Figure~\ref{fig:kd-overview} summarizes the overall impact of knowledge distilla
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.95\linewidth]{kd_overview.pdf}
+    \includegraphics[width=\linewidth]{kd_overview.pdf}
     \caption{Knowledge distillation impact: comparison of best standalone training, best KD with default $\alpha = 0.7$, and best KD with optimally tuned $\alpha$. Alpha tuning produces substantial improvements for Swin-T and DeiT3-B.}
     \label{fig:kd-overview}
 \end{figure}
@@ -458,7 +459,7 @@ Table~\ref{tab:quant-results} reports the effect of post-training quantization o
     \centering
     \caption{Post-training quantization results. FP16 conversion is effectively lossless across all models. INT8 dynamic quantization induces rank-1 drops of at most 0.16 percentage points and in one case produces a slight improvement ($+$0.08\,pp for DeiT3-B KD).}
     \label{tab:quant-results}
-    \begin{tabular}{l c c c c}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c}
         \toprule
         Model & Precision & Size (MB) & rank-1 & $\Delta$ rank-1 \\
         \midrule
@@ -482,7 +483,7 @@ Table~\ref{tab:quant-results} reports the effect of post-training quantization o
             & FP16 & 164.2 & 0.5496 &  0.000 \\
             & INT8 &  84.6 & 0.5486 & $-$0.001 \\
         \bottomrule
-    \end{tabular}
+    \end{tabular*}
 \end{table}
 
 FP16 conversion is \textbf{lossless for all models}, with cosine similarity between FP32 and FP16 embeddings exceeding 0.9999 in every case. This is expected, as half-precision provides sufficient dynamic range for inference-only workloads where no gradient accumulation occurs.
@@ -500,26 +501,32 @@ Table~\ref{tab:pruning-results} summarizes the pruning and quantization results 
     \caption{Pruning + quantization results. Rank-1 accuracy, model size, and compression ratio relative to the unpruned FP32 model. Bold entries denote configurations that \emph{improve} over the corresponding unpruned model. $^\dagger$Block dropping on Swin-B improves accuracy by $+$0.039, suggesting over-parameterization on TinyFace.}
     \label{tab:pruning-results}
     \footnotesize
-    \begin{tabular}{l l c c c c}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c}
         \toprule
         Model & Pruning & Prec. & Size (MB) & Ratio & rank-1 \\
         \midrule
-        \multirow{4}{*}{DeiT3-B LoRA}
+        \multirow{5}{*}{DeiT3-B LoRA}
+            & None (unpruned) & FP32 & 327.7 & 1.00$\times$ & 0.5834 \\
             & 10\% heads & INT8 &  82.0 & 4.00$\times$ & \textbf{0.5864} \\
             & 25\% heads & INT8 &  77.8 & 4.21$\times$ & 0.5638 \\
             & 50\% heads & INT8 &  71.0 & 4.62$\times$ & 0.5099 \\
             & 3 blocks   & INT8 &  64.0 & 5.12$\times$ & 0.5443 \\
         \midrule
-        DeiT3-B KD & 25\% heads & INT8 &  77.8 & 4.21$\times$ & 0.5646 \\
+        \multirow{2}{*}{DeiT3-B KD}
+            & None (unpruned) & FP32 & 327.7 & 1.00$\times$ & 0.5807 \\
+            & 25\% heads & INT8 &  77.8 & 4.21$\times$ & 0.5646 \\
         \midrule
-        \multirow{3}{*}{Swin-B}
+        \multirow{4}{*}{Swin-B}
+            & None (unpruned) & FP32 & 334.9 & 1.00$\times$ & 0.5359 \\
             & 10\% heads & INT8 &  85.1 & 3.94$\times$ & 0.4970 \\
             & 25\% heads & INT8 &  81.2 & 4.12$\times$ & 0.4659 \\
             & 5 blocks$^\dagger$   & INT8 &  71.2 & 4.70$\times$ & \textbf{0.5719} \\
         \midrule
-        Swin-T KD & 10\% heads & INT8 &  27.8 & 3.84$\times$ & 0.5035 \\
+        \multirow{2}{*}{Swin-T KD}
+            & None (unpruned) & FP32 & 106.9 & 1.00$\times$ & 0.5491 \\
+            & 10\% heads & INT8 &  27.8 & 3.84$\times$ & 0.5035 \\
         \bottomrule
-    \end{tabular}
+    \end{tabular*}
 \end{table}
 
 Several findings emerge from the pruning experiments:
@@ -540,7 +547,7 @@ Figure~\ref{fig:pruning-method} compares the two pruning strategies across model
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.95\linewidth]{pruning_method_comparison.pdf}
+    \includegraphics[width=\linewidth]{pruning_method_comparison.pdf}
     \caption{Comparison of pruning methods (FP32). DeiT3-B (LoRA) is shown with four pruning configurations (three head-pruning ratios and block dropping); Swin-B is shown with three (10\% heads, 25\% heads, and block dropping). Both head-pruning ratios degrade Swin-B substantially ($-$0.039 and $-$0.069 rank-1, respectively), while block dropping \emph{improves} accuracy by $+$0.039, confirming that Swin-B is over-parameterized in depth rather than width.}
     \label{fig:pruning-method}
 \end{figure}
@@ -556,7 +563,8 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
     \centering
     \caption{Overall best results across all experimental phases. The best accuracy-per-byte configuration is Swin-B with 5 blocks removed at INT8 (0.572 rank-1, 71.2\,MB). The best absolute student result remains Swin-T + KD ($\alpha{=}0.0$) at 0.616 rank-1.}
     \label{tab:overall-summary}
-    \begin{tabular}{l l c c c c}
+    \footnotesize
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c}
         \toprule
         Model & Method & Params & Size & rank-1 & mAP \\
         \midrule
@@ -569,15 +577,19 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
         DeiT3-B  & Baseline                         & 85.8\,M & 327.7\,MB & 0.583 & 0.639 \\
         Swin-T   & LoRA                             & 27.5\,M & 106.9\,MB & 0.562 & 0.619 \\
         \midrule
-        \multicolumn{6}{l}{\textit{Pruning + quantization}} \\
+        \multicolumn{6}{l}{\textit{Pruning + quantization$^\ddagger$}} \\
+        DeiT3-B LoRA  & Unpruned, FP32   & 85.8\,M & 327.7\,MB & 0.583 & 0.639 \\
         DeiT3-B LoRA  & 10\% heads, INT8 & 84.7\,M & 82.0\,MB & 0.586 & 0.640 \\
-        Swin-B        & 5 blocks, INT8   & 73.3\,M & 71.2\,MB & 0.572 & 0.628 \\
         DeiT3-B LoRA  & 3 blocks, INT8   & 66.2\,M & 64.0\,MB & 0.544 & 0.597 \\
-        Swin-T KD     & INT8 (no pruning) & 27.5\,M & 28.3\,MB & 0.548 & 0.601 \\
+        Swin-B        & Unpruned, FP32   & 86.7\,M & 334.9\,MB & 0.536 & 0.594 \\
+        Swin-B        & 5 blocks, INT8   & 73.3\,M & 71.2\,MB & 0.572 & 0.628 \\
+        Swin-T KD ($\alpha{=}0.7$) & Unpruned, FP32 & 27.5\,M & 106.9\,MB & 0.549 & 0.606 \\
+        Swin-T KD ($\alpha{=}0.7$) & INT8 (no pruning) & 27.5\,M & 28.3\,MB & 0.548 & 0.601 \\
         \midrule
         ResNet-50 & Baseline                        & 23.5\,M & --- & 0.476 & 0.542 \\
         \bottomrule
-    \end{tabular}
+        \multicolumn{6}{l}{\scriptsize $^\ddagger$Pruning baselines use the default $\alpha{=}0.7$ KD checkpoint.} \\
+    \end{tabular*}
 \end{table}
 
 The experimental findings carry several implications for embedded vision transformer deployment:

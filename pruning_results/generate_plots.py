@@ -32,10 +32,12 @@ def save(fig, name):
 # ── Styling ──────────────────────────────────────────────────────────────────
 
 plt.rcParams.update({
-    "font.size": 11,
-    "axes.titlesize": 13,
-    "axes.labelsize": 12,
-    "legend.fontsize": 9,
+    "font.size": 18,
+    "axes.titlesize": 20,
+    "axes.labelsize": 18,
+    "xtick.labelsize": 16,
+    "ytick.labelsize": 16,
+    "legend.fontsize": 16,
     "figure.dpi": 150,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.15,
@@ -239,7 +241,7 @@ save(fig, "int8_impact_pruned.png")
 # ── 3. Pruning method comparison by architecture ─────────────────────────────
 print("Generating pruning method comparison...")
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
 # -- DeiT3 panel --
 deit_data = compression[compression["model"].str.startswith("deit3_base (LoRA)")].copy()
@@ -251,19 +253,26 @@ rank1 = deit_fp32["rank_at_1"].values
 sizes = deit_fp32["size_MB"].values
 bar_colors_d = ["#aec7e8" if "Original" in m else "#1f77b4" for m in methods]
 
+def _multiline_label(m):
+    """Convert e.g. 'Pruned 50% heads FP32' -> 'Pruned\n50% heads'."""
+    m = m.replace(" FP32", "")
+    if m.startswith("Pruned "):
+        rest = m[len("Pruned "):]
+        return f"Pruned\n{rest}"
+    return m
+
 y = np.arange(len(methods))
 bars = ax.barh(y, rank1, color=bar_colors_d, edgecolor="white", height=0.6)
 for bar, val, sz in zip(bars, rank1, sizes):
     ax.text(bar.get_width() + 0.002, bar.get_y() + bar.get_height() / 2,
-            f"{val:.4f} ({sz:.0f} MB)", va="center", fontsize=9)
+            f"{sz:.0f} MB", va="center", fontsize=16)
 ax.set_yticks(y)
-ax.set_yticklabels([m.replace(" FP32", "") for m in methods], fontsize=9)
+ax.set_yticklabels([_multiline_label(m) for m in methods], fontsize=16)
 ax.set_xlabel("Rank-1 Identification Rate")
 ax.set_title("DeiT3-Base (LoRA)")
-ax.set_xlim(0.48, 0.62)
+ax.set_xlim(0.48, 0.63)
 ax.grid(axis="x", alpha=0.3)
-ax.axvline(x=0.5834, color="red", ls="--", alpha=0.5, lw=1.2, label="Baseline")
-ax.legend(fontsize=9)
+ax.axvline(x=0.5834, color="red", ls="--", alpha=0.5, lw=1.2)
 
 # -- Swin panel --
 swin_data = compression[
@@ -282,17 +291,16 @@ y_s = np.arange(len(methods_s))
 bars = ax.barh(y_s, rank1_s, color=bar_colors_s, edgecolor="white", height=0.6)
 for bar, val, sz in zip(bars, rank1_s, sizes_s):
     ax.text(bar.get_width() + 0.002, bar.get_y() + bar.get_height() / 2,
-            f"{val:.4f} ({sz:.0f} MB)", va="center", fontsize=9)
+            f"{sz:.0f} MB", va="center", fontsize=16)
 ax.set_yticks(y_s)
-ax.set_yticklabels([m.replace(" FP32", "") for m in methods_s], fontsize=9)
+ax.set_yticklabels([_multiline_label(m) for m in methods_s], fontsize=16)
 ax.set_xlabel("Rank-1 Identification Rate")
 ax.set_title("Swin-Base")
-ax.set_xlim(0.42, 0.62)
+ax.set_xlim(0.42, 0.63)
 ax.grid(axis="x", alpha=0.3)
-ax.axvline(x=0.5359, color="red", ls="--", alpha=0.5, lw=1.2, label="Baseline")
-ax.legend(fontsize=9)
+ax.axvline(x=0.5359, color="red", ls="--", alpha=0.5, lw=1.2)
 
-fig.suptitle("Pruning Method Comparison (FP32)", fontsize=14, y=1.01)
+fig.suptitle("Pruning Method Comparison (FP32)", fontsize=22, y=1.01)
 fig.tight_layout()
 save(fig, "pruning_method_comparison.png")
 # NOTE: DeiT3-B has 5 bars (original + 3 head-pruning ratios + block dropping)
