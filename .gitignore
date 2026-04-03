@@ -4,6 +4,7 @@ model.plan
 onnx_models/
 onnx_models_fp16/
 onnx_models_int8/
+pruned_models/
 __pycache__/
 wandb/
 tinyface-timm/
