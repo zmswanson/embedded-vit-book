@@ -1,7 +1,7 @@
 #!/bin/bash
 # KD Alpha Ablation Study
 #
-# Sweeps kd_alpha on 4 best configs (2 students × 2 teachers) from Phase 2.5
+# Sweeps kd_alpha on 4 best configs (2 students × 2 teachers)
 # 8 alpha values × 4 configs = 32 runs
 
 set -euo pipefail
@@ -60,7 +60,7 @@ DEIT3_PET_HP="--lr 5.782e-4 --weight_decay 1e-5 --backbone_dropout 0.165 \
     --head_scale 96 --head_margin 0.357 --adaface_h 0.2015 --adaface_t_alpha 0.0438"
 
 # ──────────────────────────────────────────────
-# Common settings (same as Phase 2.2 except kd_alpha varies)
+# Common settings (kd_alpha)
 # ──────────────────────────────────────────────
 KD_BASE="--img_size 96 --batch_size 8 --max_epochs 50 --seed 73 \
     --head_type adaface --kd_feature_loss cosine \

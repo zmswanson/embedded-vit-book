@@ -125,7 +125,7 @@ def plot_baseline_comparison():
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Plot 2: Baseline vs LoRA comparison (Phase 1 final models)
+# Plot 2: Baseline vs LoRA comparison 
 # ═══════════════════════════════════════════════════════════════════
 def plot_baseline_vs_lora():
     # Values from kd_comparison_final.md Table 1 (verified ground truth)
@@ -222,7 +222,7 @@ def plot_kd_overview():
         "PETALface (FT)": 0.663,
     }
 
-    # Best Phase 1 and KD results per model from kd_comparison_final.md Table 4
+    # Best baseline/lora and KD results per model from kd_comparison_final.md Table 4
     models = ["Swin-T", "Swin-S", "Swin-B", "DeiT3-S", "DeiT3-M", "DeiT3-B"]
     phase1_best = [0.562, 0.554, 0.536, 0.552, 0.570, 0.583]
     kd_best = [0.567, 0.559, 0.536, 0.543, 0.559, 0.581]

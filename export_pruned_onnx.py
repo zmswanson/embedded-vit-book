@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Export pruned models to ONNX, quantize (FP16/INT8), and build analysis CSVs.
 
-Phase 4.3: Reconstructs pruned architecture from original checkpoints,
+Reconstructs pruned architecture from original checkpoints,
 loads fine-tuned state_dicts, exports to ONNX, applies quantization,
 and produces compression_analysis.csv and pareto_data.csv.
 """
@@ -135,7 +135,7 @@ EXPERIMENTS = [
     },
 ]
 
-# Baseline ONNX models (from Phase 3.1 manifest) for comparison
+# Baseline ONNX models for comparison
 BASELINES = [
     {
         "name": "deit3_base (LoRA)",
@@ -591,7 +591,7 @@ def write_csv(rows: list, path: str, fieldnames: list):
 
 def main():
     print("=" * 70)
-    print("Phase 4.3: Export pruned models → ONNX → FP16/INT8")
+    print("Export pruned models → ONNX → FP16/INT8")
     print("=" * 70)
 
     export_results = []  # list of (exp_dict, result_dict) tuples

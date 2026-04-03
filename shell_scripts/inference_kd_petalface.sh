@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase 2.5: Evaluate 12 PETALface KD Swin students on TinyFace test set.
+# Evaluate 12 PETALface KD Swin students on TinyFace test set.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -63,7 +63,7 @@ def add(line=""):
     print(line)
 
 add("# LoRA Sweep Analysis Summary")
-add(f"\nGenerated from Phase 1.1 analysis script.\n")
+add(f"\nGenerated from baseline analysis script.\n")
 
 for sweep_key, info in sweeps.items():
     path = os.path.join(DATA_DIR, info["file"])

@@ -1,4 +1,4 @@
-# Phase 2.3 — CVLFace KD Evaluation Results
+# CVLFace KD Evaluation Results
 
 TinyFace **test-set** rank@1 accuracy.  All students trained at 96×96 with
 ImageNet-pretrained timm backbones.  Teacher is CVLFace ViT-Base (112×112).

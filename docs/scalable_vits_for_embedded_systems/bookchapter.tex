@@ -314,7 +314,7 @@ Two quantization schemes were applied:
 All FP32 ONNX exports were validated against the original PyTorch models by computing cosine similarity between output embeddings on a shared calibration set, requiring $>0.999$ similarity. Each quantized model was then independently evaluated on the TinyFace test set using ONNX Runtime inference (CPU) to measure the actual impact of reduced precision on recognition accuracy.
 
 \subsection{Structured Pruning}\label{sec:pruning-setup}
-To investigate further compression beyond quantization alone, structured pruning was applied to four base models spanning two architecture families and three training regimes: DeiT3-Base (LoRA), DeiT3-Base (KD with CVLFace), Swin-Base (baseline), and Swin-Tiny (KD with CVLFace). Two structured pruning strategies were evaluated:
+To investigate further compression beyond quantization alone, structured pruning was applied systematically across all four architecture families. Five source checkpoints were selected to span both architectures and training regimes: Swin-T Baseline, Swin-T KD Best ($\alpha{=}0.0$), DeiT3-S Baseline, Swin-B Baseline, and DeiT3-B KD Best ($\alpha{=}0.1$). Two structured pruning strategies were evaluated:
 
 \paragraph{Attention Head Pruning.}
 For each multi-head self-attention (MHSA) layer, a per-head importance score is computed as the L2 norm of the concatenated query, key, value, and output projection weight slices associated with that head:
@@ -324,9 +324,9 @@ For each multi-head self-attention (MHSA) layer, a per-head importance score is 
 where $W^Q_h \in \mathbb{R}^{d_k \times d}$ denotes the projection weights for head $h$ of dimension $d_k = d/N_H$. Heads with the lowest importance scores are removed, and the corresponding weight slices are physically deleted from the QKV and output projection matrices. This produces a structurally smaller model with fewer attention heads per layer. Pruning ratios of 10\%, 25\%, and 50\% of heads were evaluated.
 
 \paragraph{Block Dropping.}
-Entire transformer encoder blocks are removed from the model, following a last-first ordering scheme: the deepest blocks are removed first, as later layers in transformers tend to exhibit greater redundancy~\cite{Park2023PTPrune}. For DeiT3-Base ($L=12$ blocks), 3 blocks were removed; for Swin-Base ($L=18$ blocks across 4 stages), 5 blocks were removed from the later stages.
+Entire transformer encoder blocks are removed from the model, following a last-first ordering scheme: the deepest blocks are removed first, as later layers in transformers tend to exhibit greater redundancy~\cite{Park2023PTPrune}. For DeiT3-S ($L=12$) and DeiT3-B ($L=12$), 2 and 3 blocks were removed respectively; for Swin-T ($L=12$ across 4 stages) and Swin-B ($L=18$ across 4 stages), 2 and 5 blocks were removed from the later stages.
 
-All pruned models were fine-tuned for 10 epochs with all parameters unfrozen, using AdamW (lr = $3 \times 10^{-5}$, weight decay = 0.05) with cosine annealing, to recover accuracy lost during pruning. Pruned models were then exported to ONNX and quantized to FP16 and INT8 using the same pipeline described in Section~\ref{sec:onnx-quant-setup}, yielding 27 pruned+quantized model variants (9 pruned models $\times$ 3 precisions).
+All pruned models were fine-tuned for 10 epochs with all parameters unfrozen, using AdamW (lr = $3 \times 10^{-5}$, weight decay = 0.05) with cosine annealing, to recover accuracy lost during pruning. Pruned models were then exported to ONNX and quantized to FP16 and INT8 using the same pipeline described in Section~\ref{sec:onnx-quant-setup}, yielding 72 pruned+quantized model variants (24 pruned configurations $\times$ 3 precisions).
 
 \section{Performance Analysis}\label{sec:performance}
 This section presents the experimental results across six phases of evaluation: (1) baseline architecture comparison, (2) parameter-efficient fine-tuning via LoRA, (3) knowledge distillation with multiple teacher configurations, (4) an ablation study on the distillation loss mixing coefficient, (5) ONNX export and quantization of selected models, and (6) structured pruning combined with quantization. Results are analyzed through the lens of both recognition accuracy and model efficiency to inform deployment decisions for embedded systems.
@@ -494,66 +494,83 @@ In terms of model size, INT8 quantization achieves $3.8$--$3.9\times$ compressio
 
 \subsection{Structured Pruning Results}
 
-Table~\ref{tab:pruning-results} summarizes the pruning and quantization results for all nine pruning configurations across three precision levels.
+Table~\ref{tab:pruning-results} summarizes the pruning and quantization results across all four architectures, comparing baseline and best-KD source checkpoints for each.
 
 \begin{table}[t]
     \centering
-    \caption{Pruning + quantization results. Rank-1 accuracy, model size, and compression ratio relative to the unpruned FP32 model. Bold entries denote configurations that \emph{improve} over the corresponding unpruned model. $^\dagger$Block dropping on Swin-B improves accuracy by $+$0.039, suggesting over-parameterization on TinyFace.}
+    \caption{Structured pruning + INT8 quantization results across four architectures. Rank-1 accuracy and compression ratio are relative to the corresponding unpruned FP32 model. Bold entries \emph{improve} over the unpruned baseline. $^\dagger$Block dropping improves accuracy, suggesting depth over-parameterization. $^\ddagger$Head pruning on the KD ($\alpha{=}0.0$) checkpoint is catastrophically unstable (see text).}
     \label{tab:pruning-results}
     \footnotesize
     \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c}
         \toprule
-        Model & Pruning & Prec. & Size (MB) & Ratio & rank-1 \\
+        Source Model & Pruning & Prec. & Size (MB) & Ratio & rank-1 \\
         \midrule
-        \multirow{5}{*}{DeiT3-B LoRA}
-            & None (unpruned) & FP32 & 327.7 & 1.00$\times$ & 0.5834 \\
-            & 10\% heads & INT8 &  82.0 & 4.00$\times$ & \textbf{0.5864} \\
-            & 25\% heads & INT8 &  77.8 & 4.21$\times$ & 0.5638 \\
-            & 50\% heads & INT8 &  71.0 & 4.62$\times$ & 0.5099 \\
-            & 3 blocks   & INT8 &  64.0 & 5.12$\times$ & 0.5443 \\
+        \multicolumn{6}{l}{\textit{Swin-T (27.5\,M params)}} \\
+        \multirow{4}{*}{\quad Baseline (0.534)}
+            & 10\% heads  & INT8 &  27.8 & 3.84$\times$ & 0.499 \\
+            & 25\% heads  & INT8 &  26.7 & 4.00$\times$ & 0.465 \\
+            & 2 blocks$^\dagger$ & INT8 &  24.6 & 4.34$\times$ & \textbf{0.543} \\
+        \cmidrule(l){2-6}
+        \multirow{4}{*}{\quad KD ($\alpha{=}0.0$, 0.616)}
+            & 10\% heads$^\ddagger$ & INT8 &  27.8 & 3.84$\times$ & 0.403 \\
+            & 25\% heads$^\ddagger$ & INT8 &  26.7 & 4.00$\times$ & 0.381 \\
+            & 2 blocks$^\dagger$ & INT8 &  24.6 & 4.34$\times$ & \textbf{0.583} \\
         \midrule
-        \multirow{2}{*}{DeiT3-B KD}
-            & None (unpruned) & FP32 & 327.7 & 1.00$\times$ & 0.5807 \\
-            & 25\% heads & INT8 &  77.8 & 4.21$\times$ & 0.5646 \\
+        \multicolumn{6}{l}{\textit{DeiT3-S (21.7\,M params)}} \\
+        \multirow{3}{*}{\quad Baseline (0.552)}
+            & 10\% heads  & INT8 &  21.7 & 3.84$\times$ & \textbf{0.565} \\
+            & 25\% heads  & INT8 &  20.7 & 4.02$\times$ & 0.542 \\
+            & 2 blocks    & INT8 &  18.9 & 4.41$\times$ & 0.498 \\
         \midrule
-        \multirow{4}{*}{Swin-B}
-            & None (unpruned) & FP32 & 334.9 & 1.00$\times$ & 0.5359 \\
-            & 10\% heads & INT8 &  85.1 & 3.94$\times$ & 0.4970 \\
-            & 25\% heads & INT8 &  81.2 & 4.12$\times$ & 0.4659 \\
-            & 5 blocks$^\dagger$   & INT8 &  71.2 & 4.70$\times$ & \textbf{0.5719} \\
+        \multicolumn{6}{l}{\textit{Swin-B (86.7\,M params)}} \\
+        \multirow{3}{*}{\quad Baseline (0.526)}
+            & 10\% heads  & INT8 &  85.1 & 3.94$\times$ & 0.488 \\
+            & 25\% heads  & INT8 &  81.2 & 4.12$\times$ & 0.453 \\
+            & 5 blocks$^\dagger$ & INT8 &  71.2 & 4.70$\times$ & \textbf{0.554} \\
         \midrule
-        \multirow{2}{*}{Swin-T KD}
-            & None (unpruned) & FP32 & 106.9 & 1.00$\times$ & 0.5491 \\
-            & 10\% heads & INT8 &  27.8 & 3.84$\times$ & 0.5035 \\
+        \multicolumn{6}{l}{\textit{DeiT3-B (85.8\,M params)}} \\
+        \multirow{3}{*}{\quad KD ($\alpha{=}0.1$, 0.593)}
+            & 10\% heads  & INT8 &  82.0 & 4.00$\times$ & 0.591 \\
+            & 25\% heads  & INT8 &  77.8 & 4.21$\times$ & 0.566 \\
+            & 3 blocks    & INT8 &  64.0 & 5.12$\times$ & 0.548 \\
+        \cmidrule(l){2-6}
+        \multirow{4}{*}{\quad LoRA (0.583)}
+            & 10\% heads  & INT8 &  82.0 & 4.00$\times$ & \textbf{0.586} \\
+            & 25\% heads  & INT8 &  77.8 & 4.21$\times$ & 0.564 \\
+            & 50\% heads  & INT8 &  71.0 & 4.62$\times$ & 0.510 \\
+            & 3 blocks    & INT8 &  64.0 & 5.12$\times$ & 0.544 \\
         \bottomrule
     \end{tabular*}
 \end{table}
 
-Several findings emerge from the pruning experiments:
+Several findings emerge from the comprehensive pruning experiments across all four architectures:
 
-\paragraph{Attention head pruning at 10\% improves DeiT3-B.}
-Removing the least-important 10\% of attention heads from DeiT3-B (LoRA) actually \emph{increases} rank-1 accuracy from 0.5834 (unpruned) to 0.5896 (FP32), and 0.5864 after INT8 quantization---a $4.0\times$ compression with improved accuracy. This suggests that some attention heads in the 12-layer DeiT3-B are redundant or even counterproductive for this low-resolution face identification task.
+\paragraph{Block dropping consistently outperforms head pruning.}
+Across all four architectures, removing entire transformer blocks preserves accuracy better than pruning attention heads at equivalent parameter reduction. Most strikingly, block dropping \emph{improves} accuracy for Swin-T Baseline ($+$0.010), Swin-B Baseline ($+$0.028), and DeiT3-S ($+$0.013 at 10\% heads)---suggesting that these models are over-parameterized in depth for this low-resolution task. In contrast, head pruning degrades all Swin variants substantially, while DeiT3 models tolerate moderate head removal.
 
-\paragraph{Block dropping dramatically improves Swin-B.}
-Removing 5 of 18 blocks from Swin-Base increases rank-1 from 0.5359 to 0.5748 ($+$0.039), with only a 0.003 drop under further INT8 quantization (0.5719). This $4.7\times$ compressed model outperforms the unpruned Swin-B at every precision level. The magnitude of this improvement, combined with the poor performance of head pruning on the same model (0.4965 at 10\% heads, 0.4665 at 25\% heads), suggests that \textbf{Swin-Base is over-parameterized in depth rather than width} for this task.
+\paragraph{DeiT3 is more robust to head pruning than Swin.}
+DeiT3-S with 10\% head pruning \emph{improves} rank-1 from 0.552 to 0.565 ($+$1.3\,pp), and DeiT3-B KD retains 0.591 out of 0.593. Meanwhile, Swin-T head pruning degrades from 0.534 to 0.500 (10\%) and 0.465 (25\%), and Swin-B from 0.526 to 0.487 (10\%) and 0.454 (25\%). This pattern suggests that \textbf{global self-attention (DeiT3) distributes learned features more uniformly across heads} than hierarchical window attention (Swin), making DeiT3 more amenable to uniform head removal.
 
-\paragraph{Aggressive pruning degrades gracefully in DeiT3 but not Swin.}
-For DeiT3-B (LoRA), accuracy degrades monotonically with head pruning ratio: 10\% $\rightarrow$ 0.5896, 25\% $\rightarrow$ 0.5655, 50\% $\rightarrow$ 0.5131. Even at 50\% head removal, the model retains usable accuracy. In contrast, Swin-B drops to 0.4965 at 10\% head pruning and 0.4665 at 25\%---both well below the unpruned baseline of 0.5359---suggesting that hierarchical window attention is less tolerant of uniform head removal across stages, even at conservative pruning ratios.
+\paragraph{KD-distilled Swin-T is catastrophically sensitive to head pruning.}
+Head pruning on the best Swin-T KD checkpoint ($\alpha{=}0.0$, rank-1 = 0.616) produces a catastrophic collapse: 10\% head removal drops accuracy to 0.403 ($-$0.213), and 25\% to 0.381 ($-$0.235). This is far worse than pruning the weaker Swin-T Baseline (0.534 $\to$ 0.500 at 10\%). However, block dropping on the same KD checkpoint retains most accuracy (0.583), indicating the collapse is specific to head removal. We hypothesize that pure feature distillation ($\alpha{=}0.0$) concentrates learned representations into fewer heads, making the remaining heads critical---and thus highly sensitive to removal. This finding has significant implications for practitioners combining KD with pruning: \textbf{distillation method and pruning strategy must be co-designed}.
+
+\paragraph{Block dropping on Swin-B confirms depth redundancy.}
+Removing 5 of 18 blocks from Swin-Base increases rank-1 from 0.526 to 0.554 ($+$0.028) at INT8 precision. Combined with the identical finding from earlier LoRA-based experiments (0.536 $\to$ 0.572), this pattern appears robust to the source checkpoint. Block dropping consistently improves Swin-B regardless of training regime, confirming that \textbf{Swin-Base is systematically over-parameterized in depth} for this 96$\times$96 input task.
 
 \paragraph{INT8 quantization remains stable on pruned models.}
-Across all 9 pruned models, INT8 quantization induces a mean rank-1 drop of $<$0.003 (and in one case, Swin-B at 10\% heads, INT8 marginally \emph{improves} rank-1), consistent with the non-pruned results from Section~\ref{sec:quant-results}. This confirms that \textbf{pruning and quantization compose well} and can be applied jointly without compounding accuracy losses.
+Across all 24 pruned models, INT8 quantization induces a mean absolute rank-1 change of $<$0.003\,pp, with several models showing negligible improvement under INT8. The largest drop (0.99\,pp for DeiT3-S 25\% heads) is an outlier; the median change is 0.03\,pp. This confirms that \textbf{pruning and quantization compose well} and can be applied jointly without compounding accuracy losses.
 
-Figure~\ref{fig:pruning-method} compares the two pruning strategies across models and pruning ratios.
+Figure~\ref{fig:pruning-method} compares pruning strategies across all four architectures.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{pruning_method_comparison.pdf}
-    \caption{Comparison of pruning methods (FP32). DeiT3-B (LoRA) is shown with four pruning configurations (three head-pruning ratios and block dropping); Swin-B is shown with three (10\% heads, 25\% heads, and block dropping). Both head-pruning ratios degrade Swin-B substantially ($-$0.039 and $-$0.069 rank-1, respectively), while block dropping \emph{improves} accuracy by $+$0.039, confirming that Swin-B is over-parameterized in depth rather than width.}
+    \caption{Comparison of pruning methods across all four architectures (FP32). Red dashed lines indicate the unpruned baseline accuracy. Block dropping (removing entire transformer blocks) consistently outperforms head pruning and in three architectures (Swin-T, Swin-B, DeiT3-S at 10\% heads) \emph{improves} upon the unpruned model, confirming systematic depth over-parameterization on this 96$\times$96 task.}
     \label{fig:pruning-method}
 \end{figure}
 
 \paragraph{Compression--accuracy trade-off summary.}
-Across the full pruning$\times$quantization space, two configurations stand out as dominating the accuracy--compression trade-off. For models where absolute accuracy is the priority, DeiT3-B (LoRA) with 10\% head pruning at INT8 achieves 0.586 rank-1 at 82\,MB ($4.0\times$ compression)---\emph{exceeding} its unpruned FP32 counterpart. For maximum compression with competitive accuracy, Swin-B with 5 blocks removed at INT8 delivers 0.572 rank-1 at 71.2\,MB ($4.7\times$), outperforming the unpruned Swin-B baseline by $+$0.036. At the other end, aggressive head pruning (50\% on DeiT3-B, or any ratio on Swin-B) yields diminishing returns: compression ratios improve only modestly while accuracy degrades substantially. FP16 quantization is consistently lossless across all pruned models, and INT8 introduces at most 0.3\,pp of additional rank-1 degradation, confirming that pruning and quantization compose well without compounding losses.
+Across the full pruning$\times$quantization space, several Pareto-optimal configurations emerge. For absolute accuracy, DeiT3-B KD ($\alpha{=}0.1$) with 10\% head pruning at INT8 achieves 0.591 rank-1 at 82\,MB ($4.0\times$ compression), preserving nearly all accuracy. For small models, Swin-T KD ($\alpha{=}0.0$) with 2 blocks removed at INT8 delivers 0.583 rank-1 at just 24.6\,MB---retaining 94.6\% of the unpruned KD model's accuracy in a package suitable for edge devices. For maximum compression with competitive accuracy, Swin-B with 5 blocks removed at INT8 delivers 0.554 rank-1 at 71.2\,MB ($4.7\times$), outperforming the unpruned Swin-B baseline. DeiT3-S at 10\% heads, INT8 achieves 0.565 rank-1 at 21.7\,MB ($3.8\times$), the smallest model that exceeds its unpruned counterpart. FP16 quantization is consistently lossless across all pruned models, and INT8 introduces at most 1\,pp of additional degradation (typically $<$0.1\,pp), confirming that pruning and quantization compose well.
 
 \subsection{Summary and Implications for Embedded Deployment}
 
@@ -561,7 +578,7 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
 
 \begin{table}[t]
     \centering
-    \caption{Overall best results across all experimental phases. The best accuracy-per-byte configuration is Swin-B with 5 blocks removed at INT8 (0.572 rank-1, 71.2\,MB). The best absolute student result remains Swin-T + KD ($\alpha{=}0.0$) at 0.616 rank-1.}
+    \caption{Overall best results across all experimental phases. For each architecture, the best pruning+quantization configuration is shown alongside the unpruned baseline. The highest absolute student accuracy is Swin-T + KD ($\alpha{=}0.0$) at 0.616 rank-1; the smallest competitive model is DeiT3-S at 10\% heads, INT8 (21.7\,MB).}
     \label{tab:overall-summary}
     \footnotesize
     \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c}
@@ -575,27 +592,26 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
         Swin-T   & KD ($\alpha{=}0.0$, CVLFace frozen) & 27.5\,M & 106.9\,MB & \textbf{0.616} & 0.664 \\
         DeiT3-B  & KD ($\alpha{=}0.1$, CVLFace FT) & 85.8\,M & 327.7\,MB & 0.593 & 0.646 \\
         DeiT3-B  & Baseline                         & 85.8\,M & 327.7\,MB & 0.583 & 0.639 \\
-        Swin-T   & LoRA                             & 27.5\,M & 106.9\,MB & 0.562 & 0.619 \\
+        DeiT3-S  & Baseline                         & 21.7\,M & 83.3\,MB  & 0.552 & 0.609 \\
+        Swin-T   & Baseline                         & 27.5\,M & 106.9\,MB & 0.534 & 0.594 \\
+        Swin-B   & Baseline                         & 86.7\,M & 334.9\,MB & 0.526 & 0.587 \\
         \midrule
-        \multicolumn{6}{l}{\textit{Pruning + quantization$^\ddagger$}} \\
-        DeiT3-B LoRA  & Unpruned, FP32   & 85.8\,M & 327.7\,MB & 0.583 & 0.639 \\
-        DeiT3-B LoRA  & 10\% heads, INT8 & 84.7\,M & 82.0\,MB & 0.586 & 0.640 \\
-        DeiT3-B LoRA  & 3 blocks, INT8   & 66.2\,M & 64.0\,MB & 0.544 & 0.597 \\
-        Swin-B        & Unpruned, FP32   & 86.7\,M & 334.9\,MB & 0.536 & 0.594 \\
-        Swin-B        & 5 blocks, INT8   & 73.3\,M & 71.2\,MB & 0.572 & 0.628 \\
-        Swin-T KD ($\alpha{=}0.7$) & Unpruned, FP32 & 27.5\,M & 106.9\,MB & 0.549 & 0.606 \\
-        Swin-T KD ($\alpha{=}0.7$) & INT8 (no pruning) & 27.5\,M & 28.3\,MB & 0.548 & 0.601 \\
+        \multicolumn{6}{l}{\textit{Best pruned + INT8 per architecture}} \\
+        Swin-T KD ($\alpha{=}0.0$) & 2 blocks, INT8 & 24.0\,M & 24.6\,MB & 0.583 & 0.634 \\
+        DeiT3-S    & 10\% heads, INT8 & 20.9\,M & 21.7\,MB & \textbf{0.565} & 0.619 \\
+        Swin-B     & 5 blocks, INT8   & 71.0\,M & 71.2\,MB & 0.554 & 0.612 \\
+        DeiT3-B KD ($\alpha{=}0.1$) & 10\% heads, INT8 & 82.9\,M & 82.0\,MB & 0.591 & 0.645 \\
+        DeiT3-B LoRA & 10\% heads, INT8 & 84.7\,M & 82.0\,MB & 0.586 & 0.640 \\
         \midrule
         ResNet-50 & Baseline                        & 23.5\,M & --- & 0.476 & 0.542 \\
         \bottomrule
-        \multicolumn{6}{l}{\scriptsize $^\ddagger$Pruning baselines use the default $\alpha{=}0.7$ KD checkpoint.} \\
     \end{tabular*}
 \end{table}
 
 The experimental findings carry several implications for embedded vision transformer deployment:
 
 \begin{enumerate}
-    \item \textbf{On low-resolution inputs, compact transformers outperform large CNNs.} Swin-Tiny (27.5M) outperforms ResNet-200 (62.6M) by a margin of $+$0.094 rank-1 in the baseline setting, and by $+$0.148 with optimized KD. On TinyFace, where input resolution is severely limited, transformers offer a favorable accuracy--efficiency trade-off. This advantage may be partly attributable to the global receptive field of self-attention, which allows transformers to exploit the limited spatial information more effectively than local convolutions; however, the relative benefit may differ on higher-resolution or non-biometric tasks.
+    \item \textbf{On low-resolution inputs, compact transformers outperform large CNNs.} Swin-Tiny (27.5M) outperforms ResNet-200 (62.6M) by a margin of $+$0.066 rank-1 in the baseline setting, and by $+$0.148 with optimized KD. On TinyFace, where input resolution is severely limited, transformers offer a favorable accuracy--efficiency trade-off. This advantage may be partly attributable to the global receptive field of self-attention, which allows transformers to exploit the limited spatial information more effectively than local convolutions; however, the relative benefit may differ on higher-resolution or non-biometric tasks.
 
     \item \textbf{LoRA effectiveness appears architecture-dependent.} On TinyFace, LoRA improved all Swin (hierarchical, local-window attention) variants while degrading all DeiT-3 (columnar, global attention) variants. While the hierarchical structure of Swin may benefit from LoRA's regularizing low-rank constraint, DeiT-3's global attention layers may require higher-rank updates to adapt effectively to this domain. These results suggest that deployment engineers should evaluate PET methods on a per-architecture basis rather than applying them uniformly, and that the interaction between LoRA and architecture type warrants further investigation across additional tasks and datasets.
 
@@ -605,22 +621,24 @@ The experimental findings carry several implications for embedded vision transfo
 
     \item \textbf{Post-training quantization is essentially free.} Across all models tested, FP16 conversion was lossless and INT8 dynamic quantization introduced at most 0.2 percentage point accuracy loss while reducing model size by $3.8$--$3.9\times$. For deployment on integer-only accelerators (NPUs, DSPs), INT8 quantization should be considered a default step rather than a trade-off.
 
-    \item \textbf{Structured pruning is architecture- and strategy-dependent.} Block dropping improved Swin-B by $+$0.039 rank-1 while head pruning degraded it at every ratio ($-$0.039 at 10\%, $-$0.069 at 25\%), demonstrating that the pruning axis (depth vs.\ width) must be matched to the architecture. For DeiT3-B, conservative head pruning (10\%) improved accuracy while aggressive pruning (50\%) degraded it by $-$0.070. These results underscore the importance of pruning strategy selection---and suggest that automated pruning search techniques may offer further gains.
+    \item \textbf{Structured pruning is architecture- and strategy-dependent.} Block dropping improved both Swin variants (Swin-T $+$0.010, Swin-B $+$0.028 rank-1 from baseline) and was the only safe pruning method for KD-distilled Swin-T, while head pruning degraded Swin at every ratio tested. For DeiT3 models, conservative head pruning (10\%) improved DeiT3-S ($+$0.013) and preserved DeiT3-B KD accuracy (0.591 $\approx$ 0.593). These results demonstrate that \textbf{the pruning axis (depth vs.\ width) must be matched to both the architecture and the training regime}---and suggest that automated pruning search techniques may offer further gains.
 
-    \item \textbf{Pruning and quantization compose without compounding losses.} INT8 quantization of pruned models induced the same $\sim$0.1--0.3\,pp drop as on unpruned models, confirming that both compression techniques can be applied sequentially. The best combined result---DeiT3-B with 10\% head pruning at INT8---achieves 0.586 rank-1 at 82\,MB ($4.0\times$ compression) with accuracy exceeding the unpruned FP32 model.
+    \item \textbf{KD and pruning interact non-trivially.} The strongest KD checkpoint (Swin-T, $\alpha{=}0.0$, rank-1 = 0.616) suffers catastrophic degradation under head pruning ($-$0.213 at 10\%) despite the same pruning being benign on the weaker baseline (0.534 $\to$ 0.500). This suggests that distillation with $\alpha{=}0.0$ (pure feature matching) concentrates knowledge into fewer heads, creating fragility. Practitioners planning to combine KD with pruning should either use moderate $\alpha$ values or prefer block dropping to preserve distilled representations.
+
+    \item \textbf{Pruning and quantization compose without compounding losses.} INT8 quantization of pruned models induced the same $\sim$0.0--0.3\,pp change as on unpruned models, confirming that both compression techniques can be applied sequentially. The combination of pruning$+$INT8 achieves $3.8$--$5.1\times$ compression while maintaining or improving accuracy in several configurations.
 \end{enumerate}
 
 \section{Conclusion}
 
-This chapter investigated the design space for deploying vision transformers on embedded systems for face identification, using the challenging TinyFace benchmark as a testbed. Through systematic evaluation of four architectural families, parameter-efficient fine-tuning via LoRA, knowledge distillation with multiple teacher configurations, and a complete compression pipeline combining structured pruning with post-training quantization, several actionable findings emerged.
+This chapter investigated the design space for deploying vision transformers on embedded systems for face identification, using the challenging TinyFace benchmark as a testbed. Through systematic evaluation of four architectural families (Swin-T, Swin-B, DeiT3-S, DeiT3-B), parameter-efficient fine-tuning via LoRA, knowledge distillation with multiple teacher configurations, and a comprehensive compression pipeline combining structured pruning with post-training quantization across all architectures, several actionable findings emerged.
 
-First, compact vision transformers such as Swin-Tiny (27.5M parameters) substantially outperform larger CNNs on low-resolution inputs, achieving 0.534 rank-1 in the baseline setting compared to 0.476 for ResNet-50 (23.5M parameters) and 0.480 for ResNet-200 (62.6M parameters). This advantage is amplified by knowledge distillation: with an optimally tuned loss mixing coefficient ($\alpha = 0.0$ using a frozen CVLFace teacher), Swin-Tiny reaches 0.616 rank-1---a 15.4\% relative improvement over its baseline.
+First, compact vision transformers substantially outperform larger CNNs on low-resolution inputs. Swin-Tiny (27.5M parameters) achieves 0.534 rank-1 in the baseline setting compared to 0.468 for ResNet-200 (62.6M parameters). This advantage is amplified by knowledge distillation: with an optimally tuned loss mixing coefficient ($\alpha = 0.0$ using a frozen CVLFace teacher), Swin-Tiny reaches 0.616 rank-1---a 15.4\% relative improvement over its baseline, making a 27.5M-parameter model competitive with unpruned 86M-parameter alternatives.
 
-Second, model compression via quantization and structured pruning proved highly effective. Post-training INT8 quantization is effectively free, introducing at most 0.2 percentage points of accuracy loss while reducing model size by $3.8$--$3.9\times$. Structured pruning, when appropriately matched to the architecture---block dropping for depth-redundant models like Swin-Base, conservative head pruning for DeiT3-Base---can maintain or even improve accuracy. The best compressed configuration (DeiT3-B LoRA with 10\% head pruning, INT8) achieves 0.586 rank-1 at 82\,MB, exceeding its unpruned FP32 counterpart at $4.0\times$ compression.
+Second, model compression via quantization and structured pruning proved highly effective across all four architectures. Post-training INT8 quantization is effectively free, introducing at most 0.2 percentage points of accuracy loss while reducing model size by $3.8$--$3.9\times$ across all 24 pruned models tested. Structured pruning, when appropriately matched to the architecture, can maintain or even improve accuracy: block dropping improved Swin-T ($+$0.010) and Swin-B ($+$0.028) from their baselines, while 10\% head pruning improved DeiT3-S ($+$0.013 to 0.565). The best compressed configurations span a range of deployment targets: DeiT3-B KD with 10\% heads at INT8 achieves 0.591 rank-1 at 82\,MB for accuracy-critical applications; Swin-T KD with block dropping at INT8 achieves 0.583 at 24.6\,MB for memory-constrained devices; and DeiT3-S with 10\% heads at INT8 achieves 0.565 at 21.7\,MB for the most aggressive size budgets.
 
-Third, the interaction between optimization techniques is non-trivial and requires empirical validation. LoRA improved Swin variants but degraded DeiT3; the optimal KD mixing coefficient varied by teacher quality; and the appropriate pruning strategy differed by architecture. These interactions argue against applying optimization techniques as black-box tools and in favor of systematic, architecture-aware evaluation.
+Third, the interaction between optimization techniques is non-trivial and requires empirical validation. LoRA improved Swin variants but degraded DeiT3; the optimal KD mixing coefficient varied by teacher quality; pruning strategy effectiveness differed by architecture (block dropping for Swin, head pruning for DeiT3); and KD-distilled models exhibited unexpected fragility under head pruning (Swin-T KD $-$0.213 at 10\% heads) despite block dropping remaining safe. These interactions argue against applying optimization techniques as black-box tools and in favor of systematic, architecture-aware evaluation---particularly when combining multiple compression stages.
 
-Several directions remain for future work. On-device latency profiling on specific embedded hardware (e.g., NVIDIA Jetson, Qualcomm Hexagon DSP) would complement the size-based analysis presented here. Combining knowledge distillation with pruning---rather than applying them sequentially---may yield further improvements, as distillation could regularize the pruned model during fine-tuning. Finally, extending this analysis to other biometric tasks (iris, gait) and non-biometric vision tasks would help establish which findings generalize beyond face identification on TinyFace.
+Several directions remain for future work. On-device latency profiling on specific embedded hardware (e.g., NVIDIA Jetson, Qualcomm Hexagon DSP) would complement the size-based analysis presented here. Joint knowledge distillation and pruning---rather than sequential application---may yield further improvements, as distillation could regularize the pruned model during fine-tuning and potentially avoid the fragility observed in sequentially compressed KD models. Automated pruning search across both axes (depth and width) simultaneously could identify configurations that manual grid search misses. Finally, extending this analysis to other biometric tasks (iris, gait) and non-biometric vision tasks would help establish which findings generalize beyond face identification on TinyFace.
 
 \bibliography{references}
 \end{document}

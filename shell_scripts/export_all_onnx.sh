@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase 3.2: Batch export all trained model variants to ONNX format.
+# Batch export all trained model variants to ONNX format.
 #
 # Exports backbone-only models (no classification head) using export_onnx.py.
 # KD checkpoints are auto-detected; only the student backbone is exported.

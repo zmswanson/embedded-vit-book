@@ -1,4 +1,4 @@
-"""Generate comparison tables for Phase 2.3 KD evaluation results."""
+"""Generate comparison tables for KD evaluation results."""
 import csv
 
 def load_csv(path):

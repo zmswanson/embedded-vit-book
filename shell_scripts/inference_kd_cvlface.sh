@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phase 2.3: Evaluate KD students + teacher baselines on TinyFace test set.
+# Evaluate KD students + teacher baselines on TinyFace test set.
 set -e
 
 RESULTS_DIR="inference_results"

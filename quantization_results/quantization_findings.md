@@ -1,8 +1,8 @@
-# Phase 3.3 — Post-Training Quantization Results
+# Post-Training Quantization Results
 
 ## Overview
 
-Applied FP16 and INT8 post-training quantization to all 54 ONNX models exported in Phase 3.2. Quantized models validated via embedding cosine similarity against FP32 baselines, and key models evaluated end-to-end on the TinyFace test set.
+Applied FP16 and INT8 post-training quantization to all 54 ONNX models exported previously. Quantized models validated via embedding cosine similarity against FP32 baselines, and key models evaluated end-to-end on the TinyFace test set.
 
 ## Methodology
 
@@ -84,5 +84,5 @@ No model exceeded the 2% rank@1 drop threshold that would flag a need for quanti
 
 1. **FP16 is lossless** for all models — recommended as the default deployment precision.
 2. **INT8 dynamic quantization** preserves accuracy within 0.2% rank@1 for all tested models, at 4× size reduction from FP32.
-3. **Static INT8 quantization is not viable** for dynamo-exported ONNX graphs — defer activation quantization to TensorRT engine build on Jetson (Phase 5).
+3. **Static INT8 quantization is not viable** for dynamo-exported ONNX graphs — defer activation quantization to TensorRT engine build on Jetson.
 4. Best deployment candidate: **Swin-T + CVLFace frozen KD** at INT8 = 28.3 MB with 0.5475 rank@1 (−0.16% from FP32).

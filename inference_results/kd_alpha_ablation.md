@@ -1,4 +1,4 @@
-# Phase 2.6 — KD Alpha Ablation Results
+# KD Alpha Ablation Results
 
 Sweep of `kd_alpha` (hard loss weight) across 8 values for 4 configurations.
 `L_total = α * L_CE + (1 - α) * L_feature`

@@ -25,7 +25,7 @@ import torch.nn.functional as F
 class BaseTeacher(nn.Module):
     """Abstract base for frozen teacher models.
 
-    Subclass to add new teachers (e.g., PETALface in Phase 2.4).
+    Subclass to add new teachers (e.g., PETALface).
     """
 
     EMB_DIM: int = 512  # all current teachers produce 512-d embeddings

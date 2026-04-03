@@ -1,4 +1,4 @@
-# Phase 2.5 — Final Combined KD Evaluation Results
+# Final Combined KD Evaluation Results
 
 TinyFace **test-set** evaluation. All students trained at 96×96 with
 ImageNet-pretrained timm backbones. Teachers evaluated at 112×112

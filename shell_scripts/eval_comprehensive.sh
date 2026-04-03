@@ -1,7 +1,6 @@
 #!/bin/bash
-# Evaluate all pruned+quantized ONNX models on TinyFace TEST set
-# Computes rank@1-5 and ROC metrics (AUC, mAP, EER, TPR@FPR) for each model.
-# 8 pruned models × 3 precisions (FP32, FP16, INT8) = 24 evaluations.
+# Evaluate all pruned_v2 ONNX models on TinyFace TEST set
+# 15 pruned models × 3 precisions (FP32, FP16, INT8) = 45 evaluations.
 
 set -e
 
@@ -12,7 +11,7 @@ cd "$REPO_ROOT"
 eval "$(conda shell.bash hook)"
 conda activate vit-benchmark
 
-CSV_OUT="pruning_results/eval_pruned_quantized.csv"
+CSV_OUT="pruning_results/eval_comprehensive.csv"
 rm -f "$CSV_OUT"
 
 PASSED=0
@@ -46,22 +45,29 @@ eval_model() {
     fi
 }
 
-MODELS=(
-    "deit3_base_lora-heads_0.10"
-    "deit3_base_lora-heads_0.25"
-    "deit3_base_lora-heads_0.50"
-    "deit3_base_lora-blocks_3"
-    "deit3_base_kd-heads_0.25"
-    "swin_base-heads_0.10"
-    "swin_base-heads_0.25"
-    "swin_base-blocks_5"
-    "swin_tiny_kd-heads_0.10"
+# --- New v2 pruned models (15 models) ---
+MODELS_V2=(
+    "swin_tiny_baseline-heads_0.10"
+    "swin_tiny_baseline-heads_0.25"
+    "swin_tiny_baseline-blocks_2"
+    "swin_tiny_kd_best-heads_0.10"
+    "swin_tiny_kd_best-heads_0.25"
+    "swin_tiny_kd_best-blocks_2"
+    "deit3_small_baseline-heads_0.10"
+    "deit3_small_baseline-heads_0.25"
+    "deit3_small_baseline-blocks_2"
+    "swin_base_baseline-heads_0.10"
+    "swin_base_baseline-heads_0.25"
+    "swin_base_baseline-blocks_5"
+    "deit3_base_kd_best-heads_0.10"
+    "deit3_base_kd_best-heads_0.25"
+    "deit3_base_kd_best-blocks_3"
 )
 
-for MODEL in "${MODELS[@]}"; do
-    eval_model "onnx_models/pruned/${MODEL}.onnx" "$MODEL" "FP32"
-    eval_model "onnx_models_fp16/pruned/${MODEL}.onnx" "$MODEL" "FP16"
-    eval_model "onnx_models_int8/pruned/${MODEL}.onnx" "$MODEL" "INT8"
+for MODEL in "${MODELS_V2[@]}"; do
+    eval_model "onnx_models/pruned_v2/${MODEL}.onnx" "$MODEL" "FP32"
+    eval_model "onnx_models_fp16/pruned_v2/${MODEL}.onnx" "$MODEL" "FP16"
+    eval_model "onnx_models_int8/pruned_v2/${MODEL}.onnx" "$MODEL" "INT8"
 done
 
 echo ""
