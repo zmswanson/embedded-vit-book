@@ -52,6 +52,7 @@ MODELS=(
     "deit3_base_lora-heads_0.50"
     "deit3_base_lora-blocks_3"
     "deit3_base_kd-heads_0.25"
+    "swin_base-heads_0.10"
     "swin_base-heads_0.25"
     "swin_base-blocks_5"
     "swin_tiny_kd-heads_0.10"

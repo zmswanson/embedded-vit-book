@@ -14,6 +14,9 @@ deit3_base_lora-blocks_3,INT8,onnx_models_int8/pruned/deit3_base_lora-blocks_3.o
 deit3_base_kd-heads_0.25,FP32,onnx_models/pruned/deit3_base_kd-heads_0.25.onnx,0.5676,0.6186,0.6489,0.6663,0.6821,0.970475,0.623145,0.0853,0.169064,0.795869,0.884388
 deit3_base_kd-heads_0.25,FP16,onnx_models_fp16/pruned/deit3_base_kd-heads_0.25.onnx,0.5679,0.6188,0.6494,0.6666,0.6824,0.970482,0.623398,0.0853,0.169073,0.795869,0.884388
 deit3_base_kd-heads_0.25,INT8,onnx_models_int8/pruned/deit3_base_kd-heads_0.25.onnx,0.5646,0.6137,0.6459,0.6644,0.6789,0.969624,0.619889,0.087715,0.16734,0.792918,0.88412
+swin_base-heads_0.10,FP32,onnx_models/pruned/swin_base-heads_0.10.onnx,0.4965,0.5585,0.5866,0.607,0.6223,0.95194,0.558234,0.110212,0.122372,0.73471,0.844152
+swin_base-heads_0.10,FP16,onnx_models_fp16/pruned/swin_base-heads_0.10.onnx,0.4968,0.5585,0.5866,0.6065,0.6229,0.951938,0.558354,0.109834,0.122545,0.73471,0.843616
+swin_base-heads_0.10,INT8,onnx_models_int8/pruned/swin_base-heads_0.10.onnx,0.497,0.5558,0.5869,0.606,0.6237,0.951835,0.558186,0.109123,0.125905,0.735247,0.843079
 swin_base-heads_0.25,FP32,onnx_models/pruned/swin_base-heads_0.25.onnx,0.4665,0.5252,0.5561,0.5773,0.5925,0.945614,0.528232,0.120172,0.118711,0.707886,0.820011
 swin_base-heads_0.25,FP16,onnx_models_fp16/pruned/swin_base-heads_0.25.onnx,0.4662,0.5249,0.5566,0.5767,0.5933,0.945604,0.52811,0.120171,0.118736,0.707082,0.820011
 swin_base-heads_0.25,INT8,onnx_models_int8/pruned/swin_base-heads_0.25.onnx,0.4659,0.5236,0.5534,0.5754,0.5931,0.945513,0.527144,0.120976,0.120706,0.706009,0.816792

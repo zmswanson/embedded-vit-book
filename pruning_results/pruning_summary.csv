@@ -5,5 +5,6 @@ deit3_base_lora-heads_0.50,deit3_base,LoRA,heads,0.5,0,87469824,73300224,0.1620,
 deit3_base_lora-blocks_3,deit3_base,LoRA,blocks,0.0,3,87469824,66201600,0.2431,0.5834,0.5464,0.0370
 deit3_base_kd-heads_0.25,deit3_base,KD CVLFace,heads,0.25,0,87469824,80385024,0.0810,0.5807,0.5676,0.0131
 swin_base-heads_0.25,swin_base,baseline,heads,0.25,0,89088696,83366090,0.0642,0.5359,0.4665,0.0694
+swin_base-heads_0.10,swin_base,baseline,heads,0.1,0,89088696,84745800,0.0487,0.5359,0.4965,0.0394
 swin_base-blocks_5,swin_base,baseline,blocks,0.0,5,89088696,73317096,0.1770,0.5359,0.5748,-0.0389
 swin_tiny_kd-heads_0.10,swin_tiny,KD CVLFace,heads,0.1,0,29285370,28864373,0.0144,0.5491,0.5051,0.0440

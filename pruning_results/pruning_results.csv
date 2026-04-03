@@ -1,0 +1,2 @@
+experiment,model_name,source_ckpt,prune_method,head_prune_ratio,num_blocks_to_remove,params_before,params_after,compression,finetune_epochs,finetune_lr,eval_rank1,test_rank1,best_ckpt
+swin_base-heads_0.10-ft10,swin_base_patch4_window7_224.ms_in1k,/mnt/data/wandb/checkpoints/vit_book_final_lora/ci53ufy8/epoch=39-rank1tinyface/eval/rank@1=0.556.ckpt,heads,0.1,0,89088696,87114011,0.0222,10,3e-05,0.4709,0.4965,/home/zms/engineering/scalable-vits-book/pruned_models/epoch=7-rank1tinyface/eval/rank@1=0.471.ckpt

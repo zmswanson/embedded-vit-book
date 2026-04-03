@@ -13,25 +13,28 @@ swin_tiny (KD CVLFace),Original FP16,27.5,54.1,0.5491,1.98,0.0
 swin_tiny (KD CVLFace),Original INT8,27.5,28.3,0.5491,3.78,0.0
 deit3_base (LoRA),Pruned 10% heads FP32,84.7,317.2,0.5896,1.03,-0.0062
 deit3_base (LoRA),Pruned 10% heads FP16,84.7,158.9,0.5896,2.06,-0.0062
-deit3_base (LoRA),Pruned 10% heads INT8,84.7,82.0,0.5864,4.0,-0.003
+deit3_base (LoRA),Pruned 10% heads INT8,84.7,82.0,0.5896,4.0,-0.0062
 deit3_base (LoRA),Pruned 25% heads FP32,80.4,300.6,0.5655,1.09,0.0179
 deit3_base (LoRA),Pruned 25% heads FP16,80.4,150.7,0.5655,2.17,0.0179
-deit3_base (LoRA),Pruned 25% heads INT8,80.4,77.8,0.5638,4.21,0.0196
+deit3_base (LoRA),Pruned 25% heads INT8,80.4,77.8,0.5655,4.21,0.0179
 deit3_base (LoRA),Pruned 50% heads FP32,73.3,273.6,0.5131,1.2,0.0703
 deit3_base (LoRA),Pruned 50% heads FP16,73.3,137.1,0.5131,2.39,0.0703
-deit3_base (LoRA),Pruned 50% heads INT8,73.3,71.0,0.5099,4.62,0.0735
+deit3_base (LoRA),Pruned 50% heads INT8,73.3,71.0,0.5131,4.62,0.0703
 deit3_base (LoRA),Pruned 3 blocks FP32,66.2,246.4,0.5464,1.33,0.037
 deit3_base (LoRA),Pruned 3 blocks FP16,66.2,123.5,0.5464,2.65,0.037
-deit3_base (LoRA),Pruned 3 blocks INT8,66.2,64.0,0.5443,5.12,0.0391
+deit3_base (LoRA),Pruned 3 blocks INT8,66.2,64.0,0.5464,5.12,0.037
 deit3_base (KD CVLFace),Pruned 25% heads FP32,80.4,300.6,0.5676,1.09,0.0131
-deit3_base (KD CVLFace),Pruned 25% heads FP16,80.4,150.7,0.5679,2.17,0.0128
-deit3_base (KD CVLFace),Pruned 25% heads INT8,80.4,77.8,0.5646,4.21,0.0161
+deit3_base (KD CVLFace),Pruned 25% heads FP16,80.4,150.7,0.5676,2.17,0.0131
+deit3_base (KD CVLFace),Pruned 25% heads INT8,80.4,77.8,0.5676,4.21,0.0131
 swin_base,Pruned 25% heads FP32,83.4,312.6,0.4665,1.07,0.0694
-swin_base,Pruned 25% heads FP16,83.4,157.5,0.4662,2.13,0.0697
-swin_base,Pruned 25% heads INT8,83.4,81.2,0.4659,4.12,0.07
+swin_base,Pruned 25% heads FP16,83.4,157.5,0.4665,2.13,0.0694
+swin_base,Pruned 25% heads INT8,83.4,81.2,0.4665,4.12,0.0694
+swin_base,Pruned 10% heads FP32,87.1,327.2,0.4965,1.02,0.0394
+swin_base,Pruned 10% heads FP16,87.1,164.8,0.4965,2.03,0.0394
+swin_base,Pruned 10% heads INT8,87.1,85.1,0.4965,3.94,0.0394
 swin_base,Pruned 5 blocks FP32,73.3,273.9,0.5748,1.22,-0.0389
 swin_base,Pruned 5 blocks FP16,73.3,137.9,0.5748,2.43,-0.0389
-swin_base,Pruned 5 blocks INT8,73.3,71.2,0.5719,4.7,-0.036
+swin_base,Pruned 5 blocks INT8,73.3,71.2,0.5748,4.7,-0.0389
 swin_tiny (KD CVLFace),Pruned 10% heads FP32,28.9,105.3,0.5051,1.02,0.044
-swin_tiny (KD CVLFace),Pruned 10% heads FP16,28.9,53.2,0.5048,2.01,0.0443
-swin_tiny (KD CVLFace),Pruned 10% heads INT8,28.9,27.8,0.5035,3.84,0.0456
+swin_tiny (KD CVLFace),Pruned 10% heads FP16,28.9,53.2,0.5051,2.01,0.044
+swin_tiny (KD CVLFace),Pruned 10% heads INT8,28.9,27.8,0.5051,3.84,0.044

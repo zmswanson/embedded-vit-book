@@ -98,6 +98,18 @@ EXPERIMENTS = [
         "variant": "baseline",
     },
     {
+        "name": "swin_base-heads_0.10",
+        "original_ckpt": "/mnt/data/wandb/checkpoints/vit_book_final_lora/ci53ufy8/epoch=39-rank1tinyface/eval/rank@1=0.556.ckpt",
+        "model_name": "swin_base_patch4_window7_224.ms_in1k",
+        "pruned_ckpt": "pruned_models/epoch=7-rank1tinyface/eval/rank@1=0.471.ckpt",
+        "prune_method": "heads",
+        "head_prune_ratio": 0.10,
+        "num_blocks_to_remove": 0,
+        "baseline_rank1": 0.5359,
+        "test_rank1": 0.4965,
+        "variant": "baseline",
+    },
+    {
         "name": "swin_base-blocks_5",
         "original_ckpt": "/mnt/data/wandb/checkpoints/vit_book_final_lora/ci53ufy8/epoch=39-rank1tinyface/eval/rank@1=0.556.ckpt",
         "model_name": "swin_base_patch4_window7_224.ms_in1k",
