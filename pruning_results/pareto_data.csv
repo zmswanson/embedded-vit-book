@@ -13,25 +13,25 @@ swin_tiny (KD CVLFace),54.1,1.98,0.5491,FP16
 swin_tiny (KD CVLFace),28.3,3.78,0.5491,INT8
 deit3_base (LoRA),317.2,1.03,0.5896,Pruned 10% heads
 deit3_base (LoRA),158.9,2.06,0.5896,Pruned 10% heads + FP16
-deit3_base (LoRA),82.0,4.0,0.5896,Pruned 10% heads + INT8
+deit3_base (LoRA),82.0,4.0,0.5864,Pruned 10% heads + INT8
 deit3_base (LoRA),300.6,1.09,0.5655,Pruned 25% heads
 deit3_base (LoRA),150.7,2.17,0.5655,Pruned 25% heads + FP16
-deit3_base (LoRA),77.8,4.21,0.5655,Pruned 25% heads + INT8
+deit3_base (LoRA),77.8,4.21,0.5638,Pruned 25% heads + INT8
 deit3_base (LoRA),273.6,1.2,0.5131,Pruned 50% heads
 deit3_base (LoRA),137.1,2.39,0.5131,Pruned 50% heads + FP16
-deit3_base (LoRA),71.0,4.62,0.5131,Pruned 50% heads + INT8
+deit3_base (LoRA),71.0,4.62,0.5099,Pruned 50% heads + INT8
 deit3_base (LoRA),246.4,1.33,0.5464,Pruned 3 blocks
 deit3_base (LoRA),123.5,2.65,0.5464,Pruned 3 blocks + FP16
-deit3_base (LoRA),64.0,5.12,0.5464,Pruned 3 blocks + INT8
+deit3_base (LoRA),64.0,5.12,0.5443,Pruned 3 blocks + INT8
 deit3_base (KD CVLFace),300.6,1.09,0.5676,Pruned 25% heads
-deit3_base (KD CVLFace),150.7,2.17,0.5676,Pruned 25% heads + FP16
-deit3_base (KD CVLFace),77.8,4.21,0.5676,Pruned 25% heads + INT8
+deit3_base (KD CVLFace),150.7,2.17,0.5679,Pruned 25% heads + FP16
+deit3_base (KD CVLFace),77.8,4.21,0.5646,Pruned 25% heads + INT8
 swin_base,312.6,1.07,0.4665,Pruned 25% heads
-swin_base,157.5,2.13,0.4665,Pruned 25% heads + FP16
-swin_base,81.2,4.12,0.4665,Pruned 25% heads + INT8
+swin_base,157.5,2.13,0.4662,Pruned 25% heads + FP16
+swin_base,81.2,4.12,0.4659,Pruned 25% heads + INT8
 swin_base,273.9,1.22,0.5748,Pruned 5 blocks
 swin_base,137.9,2.43,0.5748,Pruned 5 blocks + FP16
-swin_base,71.2,4.7,0.5748,Pruned 5 blocks + INT8
+swin_base,71.2,4.7,0.5719,Pruned 5 blocks + INT8
 swin_tiny (KD CVLFace),105.3,1.02,0.5051,Pruned 10% heads
-swin_tiny (KD CVLFace),53.2,2.01,0.5051,Pruned 10% heads + FP16
-swin_tiny (KD CVLFace),27.8,3.84,0.5051,Pruned 10% heads + INT8
+swin_tiny (KD CVLFace),53.2,2.01,0.5048,Pruned 10% heads + FP16
+swin_tiny (KD CVLFace),27.8,3.84,0.5035,Pruned 10% heads + INT8

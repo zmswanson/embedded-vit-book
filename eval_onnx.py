@@ -25,6 +25,7 @@ from model_eval.probe_gallery import (
     MultiLabelMethod,
     get_cosine_similarity,
     get_rank_k_accuracy,
+    get_roc_metrics,
 )
 
 
@@ -71,10 +72,13 @@ def evaluate_onnx_rank_k(
     rank_k: int = 5,
     multi_label_method: MultiLabelMethod = MultiLabelMethod.MAX,
     use_gpu: bool = False,
-) -> list[float]:
+    compute_roc: bool = False,
+) -> list[float] | tuple[list[float], dict]:
     """Run TinyFace probe-gallery evaluation with an ONNX model.
 
     Returns a list of rank-k accuracies ``[rank@1, rank@2, ..., rank@k]``.
+    If *compute_roc* is True, returns ``(ranks, roc_dict)`` where roc_dict
+    contains auc, mAP, eer, eer_threshold, tpr_at_fpr_1pct, tpr_at_fpr_5pct.
     """
     # Load ONNX session
     providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] if use_gpu else ["CPUExecutionProvider"]
@@ -114,7 +118,17 @@ def evaluate_onnx_rank_k(
         k=rank_k, multi_label_method=multi_label_method,
     )
 
-    return ranks
+    if not compute_roc:
+        return ranks
+
+    roc = get_roc_metrics(
+        cosine_sim, probe_labels, gallery_labels,
+        return_dict=True, multi_label_method=multi_label_method,
+    )
+    # Keep only scalar metrics
+    roc_scalars = {k: float(v) for k, v in roc.items()
+                   if not isinstance(v, np.ndarray)}
+    return ranks, roc_scalars
 
 
 # ------------------------------------------------------------------
@@ -142,6 +156,8 @@ def main():
                         help="Label for CSV output (default: filename stem)")
     parser.add_argument("--precision_label", default="FP32",
                         help="Precision label for CSV output")
+    parser.add_argument("--roc", action="store_true",
+                        help="Also compute ROC metrics (AUC, mAP, EER, TPR@FPR)")
     args = parser.parse_args()
 
     tf_path = args.tinyface_path or get_tinyface_path()
@@ -150,7 +166,7 @@ def main():
     print(f"Model:   {args.onnx_path}")
     print(f"Dataset: TinyFace {args.dataset}")
 
-    ranks = evaluate_onnx_rank_k(
+    result = evaluate_onnx_rank_k(
         onnx_path=args.onnx_path,
         tinyface_path=tf_path,
         img_size=args.img_size,
@@ -159,10 +175,24 @@ def main():
         dataset_type=ds_type,
         rank_k=args.rank_k,
         use_gpu=args.gpu,
+        compute_roc=args.roc,
     )
+
+    if args.roc:
+        ranks, roc_metrics = result
+    else:
+        ranks = result
+        roc_metrics = None
 
     for i, r in enumerate(ranks, 1):
         print(f"  rank@{i}: {r:.4f}")
+
+    if roc_metrics:
+        print(f"  AUC:            {roc_metrics['auc']:.6f}")
+        print(f"  mAP:            {roc_metrics['mAP']:.6f}")
+        print(f"  EER:            {roc_metrics['eer']:.6f}")
+        print(f"  TPR@FPR=1%:     {roc_metrics['tpr_at_fpr_1pct']:.6f}")
+        print(f"  TPR@FPR=5%:     {roc_metrics['tpr_at_fpr_5pct']:.6f}")
 
     # Optionally append to CSV
     if args.csv_out:
@@ -174,6 +204,10 @@ def main():
         }
         for i, r in enumerate(ranks, 1):
             row[f"rank@{i}"] = round(r, 4)
+        if roc_metrics:
+            for k in ("auc", "mAP", "eer", "eer_threshold",
+                      "tpr_at_fpr_1pct", "tpr_at_fpr_5pct"):
+                row[k] = round(roc_metrics[k], 6)
 
         csv_path = Path(args.csv_out)
         csv_path.parent.mkdir(parents=True, exist_ok=True)
