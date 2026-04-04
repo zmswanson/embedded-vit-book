@@ -167,27 +167,56 @@ def export_onnx(
         else None
     )
 
-    torch.onnx.export(
-        backbone,
-        dummy,
-        output_path,
-        input_names=["input"],
-        output_names=["output"],
-        dynamic_axes=dynamic_axes,
-        opset_version=opset_version,
-        do_constant_folding=True,
-    )
+    try:
+        torch.onnx.export(
+            backbone,
+            dummy,
+            output_path,
+            input_names=["input"],
+            output_names=["output"],
+            dynamic_axes=dynamic_axes,
+            opset_version=opset_version,
+            do_constant_folding=True,
+        )
 
-    onnx_path = Path(output_path)
-    onnx_size_mb = onnx_path.stat().st_size / (1024 * 1024)
-    # The dynamo exporter may store weights in a separate .data file
-    data_path = Path(str(output_path) + ".data")
-    if data_path.exists():
-        onnx_size_mb += data_path.stat().st_size / (1024 * 1024)
-    print(f"Exported ONNX model to {output_path}  ({onnx_size_mb:.1f} MB)")
+        onnx_path = Path(output_path)
+        onnx_size_mb = onnx_path.stat().st_size / (1024 * 1024)
+        # The dynamo exporter may store weights in a separate .data file
+        data_path = Path(str(output_path) + ".data")
+        if data_path.exists():
+            onnx_size_mb += data_path.stat().st_size / (1024 * 1024)
+        print(f"Exported ONNX model to {output_path}  ({onnx_size_mb:.1f} MB)")
 
-    # ------ validate ------
-    validate_onnx(backbone, output_path, dummy)
+        # ------ validate ------
+        validate_onnx(backbone, output_path, dummy)
+    except Exception as dynamo_err:
+        print(f"Dynamo exporter failed: {dynamo_err}")
+        print("Retrying with legacy TorchScript exporter (dynamo=False)...")
+        # Clean up failed dynamo artifacts
+        for p in [Path(output_path), Path(str(output_path) + ".data")]:
+            p.unlink(missing_ok=True)
+
+        torch.onnx.export(
+            backbone,
+            dummy,
+            output_path,
+            input_names=["input"],
+            output_names=["output"],
+            dynamic_axes=dynamic_axes,
+            opset_version=opset_version,
+            do_constant_folding=True,
+            dynamo=False,
+        )
+
+        onnx_path = Path(output_path)
+        onnx_size_mb = onnx_path.stat().st_size / (1024 * 1024)
+        data_path = Path(str(output_path) + ".data")
+        if data_path.exists():
+            onnx_size_mb += data_path.stat().st_size / (1024 * 1024)
+        print(f"Exported ONNX model to {output_path}  ({onnx_size_mb:.1f} MB)")
+
+        # ------ validate ------
+        validate_onnx(backbone, output_path, dummy)
 
 
 # ------------------------------------------------------------------
