@@ -115,7 +115,7 @@
   title        = {FaceMoE: Mixture of Experts for Low-Resolution Face Recognition},
   author       = {Narayan, Kartik and Patel, Vishal M.},
   year         = {2025},
-  note         = {Preprint (under review)},
+  comment         = {Preprint (under review)},
   url          = {https://kartik-3004.github.io/portfolio/papers/FaceMOE.pdf}
 }
 
@@ -167,7 +167,7 @@
   author = {Tal Kopetz},
   organization = {CEVA Blog},
   year = 2023,
-  note = {Describes co-optimizing transformers with NPUs and using pruning/quantization to meet edge efficiency goals, indicating ViT layers are flexible for such optimizations.}
+  comment = {Describes co-optimizing transformers with NPUs and using pruning/quantization to meet edge efficiency goals, indicating ViT layers are flexible for such optimizations.}
 }
 @book{zhang2021d2l,
   title = {Dive into Deep Learning},
@@ -175,14 +175,14 @@
   year = {2023},
   publisher = {Cambridge University Press},
   url = {https://d2l.ai},
-  note = {Section 11.5 shows that multi-head attention is implemented by splitting and transposing tensors for parallel computation of heads, confirming the throughput benefit of parallel heads.}
+  comment = {Section 11.5 shows that multi-head attention is implemented by splitting and transposing tensors for parallel computation of heads, confirming the throughput benefit of parallel heads.}
 }
 @article{ba2016layernorm,
   title = {Layer Normalization},
   author = {Ba, Jimmy Lei and Kiros, Jamie and Hinton, Geoffrey},
   journal = {arXiv:1607.06450},
   year = 2016,
-  note = {Proposes layer norm; unlike batch norm, it doesn’t use batch statistics and works the same at inference, suiting scenarios with small or variable batch sizes.}
+  comment = {Proposes layer norm; unlike batch norm, it doesn’t use batch statistics and works the same at inference, suiting scenarios with small or variable batch sizes.}
 }
 @article{dorszewski2025concepts_vit,
   title = {From Colors to Classes: Emergence of Concepts in Vision Transformers},
@@ -190,21 +190,21 @@
   journal = {Proc. 3rd World Conf. on Explainable Artificial Intelligence (xAI)},
   year = {2025},
   howpublished = {arXiv:2503.24071},
-  note = {Uses neuron-labeling to show ViTs learn increasing concept complexity across layers: early layers capture colors/textures, while later layers encode object-level semantics.}
+  comment = {Uses neuron-labeling to show ViTs learn increasing concept complexity across layers: early layers capture colors/textures, while later layers encode object-level semantics.}
 }
 @inproceedings{ranftl2021dpt,
   title = {Vision Transformers for Dense Prediction},
   author = {Ranftl, Rene and Bochkovskiy, Alexey and Koltun, Vladlen},
   booktitle = {ICCV},
   year = 2021,
-  note = {States that varying image sizes can be handled by “linearly interpolat[ing] the position embeddings to the appropriate size” as done in ViT. This is the standard strategy for resizing positional encodings.}
+  comment = {States that varying image sizes can be handled by “linearly interpolat[ing] the position embeddings to the appropriate size” as done in ViT. This is the standard strategy for resizing positional encodings.}
 }
 @article{bolya2024window_attention,
   title = {Window Attention is Bugged: How Not to Interpolate Position Embeddings},
   author = {Bolya, Daniel and Ryali, Chaitanya and Hoffman, Judy and Feichtenhofer, Christoph},
   journal = {ICLR},
   year = 2024,
-  note = {Shows that naive interpolation of positional embeddings can harm performance in some transformer variants. This underscores that while interpolation “often works well in practice,” it may introduce spatial assumptions that slightly degrade performance under large scale changes.}
+  comment = {Shows that naive interpolation of positional embeddings can harm performance in some transformer variants. This underscores that while interpolation “often works well in practice,” it may introduce spatial assumptions that slightly degrade performance under large scale changes.}
 }
 @article{ignatov2021ai_benchmark,
   title = {AI Benchmark: Running Deep Neural Networks on Android Smartphones},
@@ -212,28 +212,28 @@
   journal = {ECCV Workshops},
   year = {2019},
   howpublished = {arXiv:1810.01109},
-  note = {Shows ResNet-50 performance on mobile NPUs. Reports that with INT8 quantization, a Snapdragon NPU can achieve real-time inference for ResNet-50, enabling >100 FPS on device.}
+  comment = {Shows ResNet-50 performance on mobile NPUs. Reports that with INT8 quantization, a Snapdragon NPU can achieve real-time inference for ResNet-50, enabling >100 FPS on device.}
 }
 @misc{android2025optimization,
   title = {Hardware Optimization on Android for Inference of AI Models},
   author = {Gherasim, Iulius and Garc{\'i}a S{\'a}nchez, Carlos},
   howpublished = {arXiv:2511.13453},
   year = {2025},
-  note = {Evaluates ResNet-50 on a Snapdragon 8 Gen2 tablet. Finds the dedicated NPU achieves superior speed for ResNet-50 (INT8) compared to CPU/GPU. Table IX shows minimal accuracy loss after quantization (~0.3--0.4\%), demonstrating ResNet-50 can run in real time on mobile NPUs after quantization.}
+  comment = {Evaluates ResNet-50 on a Snapdragon 8 Gen2 tablet. Finds the dedicated NPU achieves superior speed for ResNet-50 (INT8) compared to CPU/GPU. Table IX shows minimal accuracy loss after quantization (~0.3--0.4\%), demonstrating ResNet-50 can run in real time on mobile NPUs after quantization.}
 }
 @online{ambient2025training_vs_inference,
   title = {Training vs Inference: Training Teaches, Inference Delivers},
   author = {Ambient Scientific Blog},
   year = 2025,
   url = {https://www.ambientscientific.ai/blogs/training-vs-inference-training-teaches-inference-delivers},
-  note = {States that model training “typically happens on powerful cloud infrastructure (GPUs/TPUs)” while inference runs on-device. This supports that large ViT models are trained offline on high-performance servers rather than on embedded hardware.}
+  comment = {States that model training “typically happens on powerful cloud infrastructure (GPUs/TPUs)” while inference runs on-device. This supports that large ViT models are trained offline on high-performance servers rather than on embedded hardware.}
 }
 @book{mlsys2023ondevice_chapter,
   title = {On-Device Learning (Chapter in ML Systems Design)},
   author = {Zhang, Tian and others},
   year = 2023,
   publisher = {Harvard University},
-  note = {1) Explains that traditionally, training is done centrally on big data/cloud and only inference is done on devices. Implies that in most real scenarios, especially for large models, training occurs on servers, not directly on edge devices. 2) Notes that traditionally there is a “clear division” where models are trained in the cloud and then deployed to devices in a static inference-only mode. Early embedded ML systems adhered to this, focusing on low-latency inference of pretrained models on-device. 3) Discusses that on-device learning is typically used for personalization or incremental updates. It emphasizes fine-tuning small parts of the model to user-specific data and mentions growing interest in hardware/software support for such limited ODL tasks. 4) Discusses methods to enable on-device learning under constraints. Mentions reducing stored gradients/optimizer state and only updating a small subset of parameters so that training becomes feasible on limited hardware. Also references mixed precision and sparse update techniques as ways to minimize on-device computation.}
+  comment = {1) Explains that traditionally, training is done centrally on big data/cloud and only inference is done on devices. Implies that in most real scenarios, especially for large models, training occurs on servers, not directly on edge devices. 2) Notes that traditionally there is a “clear division” where models are trained in the cloud and then deployed to devices in a static inference-only mode. Early embedded ML systems adhered to this, focusing on low-latency inference of pretrained models on-device. 3) Discusses that on-device learning is typically used for personalization or incremental updates. It emphasizes fine-tuning small parts of the model to user-specific data and mentions growing interest in hardware/software support for such limited ODL tasks. 4) Discusses methods to enable on-device learning under constraints. Mentions reducing stored gradients/optimizer state and only updating a small subset of parameters so that training becomes feasible on limited hardware. Also references mixed precision and sparse update techniques as ways to minimize on-device computation.}
 }
 @article{zhu2024ondevice_training_survey,
   title = {On-device Training: A First Overview on Existing Systems},
@@ -242,28 +242,28 @@
   year = {2024},
   doi = {10.1145/3696003},
   howpublished = {arXiv:2212.00824},
-  note = {Highlights the appeal of on-device training for privacy/personalization but also the severe resource constraints. Mentions that edge platforms face “significant challenges due to the intensive computational and memory demands” of training, especially for large models like transformers.}
+  comment = {Highlights the appeal of on-device training for privacy/personalization but also the severe resource constraints. Mentions that edge platforms face “significant challenges due to the intensive computational and memory demands” of training, especially for large models like transformers.}
 }
 @article{nadalini2025odl_tiny,
   title = {Multi-modal On-Device Learning for Monocular Depth Estimation on Ultra-low-power MCUs},
   author = {Nadalini, Davide and Rusci, Manuele and Palossi, Daniele},
   journal = {arxiv:2512.00086},
   year = 2025,
-  note = {An example of on-device adaptation: a tiny depth network on an IoT MCU is fine-tuned in the field to new sensor data. The on-device learning is restricted to incremental updates (17.8 minutes to adapt ~3k samples), illustrating that only lightweight calibration is performed on-device.}
+  comment = {An example of on-device adaptation: a tiny depth network on an IoT MCU is fine-tuned in the field to new sensor data. The on-device learning is restricted to incremental updates (17.8 minutes to adapt ~3k samples), illustrating that only lightweight calibration is performed on-device.}
 }
 @inproceedings{houlsby2019adapter,
   title = {Parameter-Efficient Transfer Learning for NLP},
   author = {Houlsby, Neil and Giurgiu, Andrei and Jastrzebski, Stanislaw and Morrone, Bruna and de Laroussilhe, Quentin and Gesmundo, Andrea and Attariyan, Mona and Gelly, Sylvain},
   booktitle = {Proceedings of the 36th International Conference on Machine Learning (ICML)},
   year = {2019},
-  note = {Introduces adapter modules to fine-tune only a few new parameters instead of the whole model. This significantly reduces on-device training cost. Such parameter-efficient fine-tuning aligns with limiting trainable parameters for on-device adaptation.}
+  comment = {Introduces adapter modules to fine-tune only a few new parameters instead of the whole model. This significantly reduces on-device training cost. Such parameter-efficient fine-tuning aligns with limiting trainable parameters for on-device adaptation.}
 }
 @misc{hinton2015distillation,
   title = {Distilling the Knowledge in a Neural Network},
   author = {Hinton, Geoffrey and Vinyals, Oriol and Dean, Jeff},
   howpublished = {arXiv:1503.02531},
   year = 2015,
-  note = {Proposes knowledge distillation. The student is trained to match the teacher’s soft output distribution (soft labels) instead of only hard labels. This provides additional informative gradients, improving the student’s generalization and training efficiency – especially useful for compact models.}
+  comment = {Proposes knowledge distillation. The student is trained to match the teacher’s soft output distribution (soft labels) instead of only hard labels. This provides additional informative gradients, improving the student’s generalization and training efficiency – especially useful for compact models.}
 }
 @inproceedings{Zhao2025H4HNAS,
   title = {H4H: Hybrid Convolution-Transformer Architecture Search for NPU-CIM Heterogeneous Systems for AR/VR Applications},
@@ -277,7 +277,7 @@
   booktitle    = {Proceedings of VALUETOOLS 2024},
   year         = {2025},
   publisher    = {Springer},
-  note         = {Preprint available at arXiv:2510.25166},
+  comment         = {Preprint available at arXiv:2510.25166},
   url          = {https://arxiv.org/abs/2510.25166},
   doi          = {10.48550/arXiv.2510.25166}
 }
@@ -301,7 +301,7 @@
   number    = {188},
   pages     = {1--51},
   year      = {2024},
-  note      = {This survey explains that quantization reduces model memory and uses cheaper arithmetic, improving speed/energy.}
+  comment      = {This survey explains that quantization reduces model memory and uses cheaper arithmetic, improving speed/energy.}
 }
 @inproceedings{Li2023IViT,
   author    = {Zhikai Li and Qingyi Gu},
@@ -309,28 +309,28 @@
   booktitle = {Proc. IEEE/CVF Int’l Conf. on Computer Vision (ICCV)},
   year      = {2023},
   pages     = {17019--17029},
-  note      = {Introduces an INT8 quantization scheme for ViTs where all linear layers (MatMul/Dense in attention and FFNs, embeddings) are quantized.}
+  comment      = {Introduces an INT8 quantization scheme for ViTs where all linear layers (MatMul/Dense in attention and FFNs, embeddings) are quantized.}
 }
 @inproceedings{Shang2024PTQ,
   author    = {Yuzhang Shang and Gaowen Liu and Ramana R. Kompella and Yan Yan},
   title     = {{Enhancing Post-Training Quantization Calibration through Contrastive Learning}},
   booktitle = {Proc. IEEE/CVF Conf. on Computer Vision and Pattern Recognition (CVPR) Workshops},
   year      = {2024},
-  note      = {Explains that PTQ uses only a small calibration set and **no retraining**, making it quick to deploy.}
+  comment      = {Explains that PTQ uses only a small calibration set and **no retraining**, making it quick to deploy.}
 }
 @article{Ranjan2024MixQViT,
   author    = {Navin Ranjan and Andreas Savakis},
   title     = {{Mix-QViT: Mixed-Precision Vision Transformer Quantization Driven by Layer Importance and Quantization Sensitivity}},
   journal   = {arXiv preprint arXiv:2501.06357},
   year      = {2025},
-  note      = {Observes that in ViTs, operations like LayerNorm and Softmax are highly sensitive to quantization, causing large accuracy drops if quantized.}
+  comment      = {Observes that in ViTs, operations like LayerNorm and Softmax are highly sensitive to quantization, causing large accuracy drops if quantized.}
 }
 @misc{IBM2023QAT,
   author       = {{IBM Cloud Education}},
   title        = {{What is Quantization Aware Training?}},
   howpublished = {IBM Developer Blog (2023)},
   url = {https://www.ibm.com/think/topics/quantization-aware-training},
-  note         = {Describes QAT as inserting fake-quantization during training so the model **learns to handle reduced precision**, improving quantized accuracy.}
+  comment         = {Describes QAT as inserting fake-quantization during training so the model **learns to handle reduced precision**, improving quantized accuracy.}
 }
 @inproceedings{Lin2022FQViT,
   author    = {Yang Lin and Tianyu Zhang and Peiqin Sun and Zheng Li and Shuchang Zhou},
@@ -338,7 +338,7 @@
   booktitle = {Proc. 31st IJCAI},
   year      = {2022},
   pages     = {1172--1178},
-  note      = {Reports that prior INT8 ViT methods left Softmax and LayerNorm in full precision to avoid accuracy loss, i.e. a mixed-precision strategy.}
+  comment      = {Reports that prior INT8 ViT methods left Softmax and LayerNorm in full precision to avoid accuracy loss, i.e. a mixed-precision strategy.}
 }
 @article{Jiang2023SingleShot,
   author    = {Bofeng Jiang and Jun Chen and Yong Liu},
@@ -347,7 +347,7 @@
   volume    = {126},
   pages     = {106816},
   year      = {2023},
-  note      = {Notes that unstructured (weight-level) pruning yields sparse kernels that **require special hardware/software support** to realize speedups.}
+  comment      = {Notes that unstructured (weight-level) pruning yields sparse kernels that **require special hardware/software support** to realize speedups.}
 }
 @inproceedings{Park2023PTPrune,
   author    = {Kwon, Woosuk and Kim, Sehoon and Mahoney, Michael W. and Hassoun, Joseph and Keutzer, Kurt and Gholami, Amir},
@@ -355,7 +355,7 @@
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
   year      = {2022},
   howpublished = {arXiv:2204.09656},
-  note      = {Reviews structured transformer pruning: both fine-grained (weights) and coarse-grained, including pruning heads, reducing FFN filters, and dropping entire layers.}
+  comment      = {Reviews structured transformer pruning: both fine-grained (weights) and coarse-grained, including pruning heads, reducing FFN filters, and dropping entire layers.}
 }
 @article{Ngo2025EdgeInference,
   author    = {Dat Ngo and Hyun-Cheol Park and Bongsoon Kang},
@@ -365,7 +365,7 @@
   number    = {12},
   pages     = {2495},
   year      = {2025},
-  note      = {Stresses that real speed/efficiency gains from quantization/pruning depend on hardware/software support – e.g., some accelerators natively support INT8, but not arbitrary sparsity.}
+  comment      = {Stresses that real speed/efficiency gains from quantization/pruning depend on hardware/software support – e.g., some accelerators natively support INT8, but not arbitrary sparsity.}
 }
 
 @inproceedings{liu2023efficientvit,
