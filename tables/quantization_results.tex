@@ -1,0 +1,28 @@
+\begin{table}[t]
+\centering
+\caption{Post-training quantization results for representative models.
+FP16 conversion is effectively lossless. INT8 dynamic quantization
+induces rank-1 drops of at most 0.16 percentage points.}
+\label{tab:quantization-full}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c}
+\toprule
+Model & Precision & Size (MB) & Rank@1 & $\Delta$ Rank@1 \\
+\midrule
+Swin-T Baseline & FP32 & 106.9 & 0.5335 & --- \\
+ & FP16 & 54.1 & 0.5335 & 0.000 \\
+ & INT8 & 28.3 & 0.5322 & $-$0.001 \\
+\midrule
+Swin-T KD (CVLFace) & FP32 & 106.9 & 0.5491 & --- \\
+ & FP16 & 54.1 & 0.5494 & $+$0.000 \\
+ & INT8 & 28.3 & 0.5475 & $-$0.002 \\
+\midrule
+DeiT3-B KD (CVLFace) & FP32 & 327.7 & 0.5719 & --- \\
+ & FP16 & 164.2 & 0.5714 & $-$0.001 \\
+ & INT8 & 84.6 & 0.5727 & $+$0.001 \\
+\midrule
+DeiT3-B LoRA & FP32 & 327.7 & 0.5496 & --- \\
+ & FP16 & 164.2 & 0.5496 & 0.000 \\
+ & INT8 & 84.6 & 0.5486 & $-$0.001 \\
+\bottomrule
+\end{tabular*}
+\end{table}

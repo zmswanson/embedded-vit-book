@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\caption{Inference latency for TRT-incompatible architectures on Jetson Orin Nano
+using ONNX Runtime TRT Execution Provider (auto sub-graph partitioning).}
+\label{tab:jetson-trt-ep}
+\footnotesize
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r}
+\toprule
+& \multicolumn{2}{c}{TRT EP FP32} & \multicolumn{2}{c}{TRT EP FP16} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Model & ms & FPS & ms & FPS \\
+\midrule
+ConvNeXt-T & 4.12 & 242 & 4.53 & 221 \\
+ConvNeXt-S & 6.21 & 161 & 5.86 & 171 \\
+ConvNeXt-B & 8.70 & 115 & 5.58 & 179 \\
+PVT-v2-B2 & 6.41 & 156 & 5.42 & 185 \\
+PVT-v2-B3 & 8.28 & 121 & 7.33 & 136 \\
+PVT-v2-B5 & 14.19 & 70 & 11.66 & 86 \\
+MobileViT-v2 & 5.29 & 189 & 5.05 & 198 \\
+\bottomrule
+\end{tabular*}
+\end{table}

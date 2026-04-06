@@ -95,12 +95,11 @@
   url          = {https://openaccess.thecvf.com/content_cvpr_2016/html/He_Deep_Residual_Learning_CVPR_2016_paper.html}
 }
 
-@misc{hu2022lora,
+@inproceedings{hu2022lora,
   title        = {LoRA: Low-Rank Adaptation of Large Language Models},
   author       = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
-  year         = {2021},
-  note         = {arXiv preprint},
-  howpublished = {arXiv:2106.09685},
+  booktitle    = {International Conference on Learning Representations (ICLR)},
+  year         = {2022},
   url          = {https://arxiv.org/abs/2106.09685}
 }
 
@@ -156,9 +155,11 @@
 
 @article{liu2025survey_vit_edge,
   title = {Vision Transformers on the Edge: A Comprehensive Survey of Model Compression and Acceleration Strategies},
-  author = {Liu, Xiangyang and ...},
+  author = {Saha, Shaibal and Xu, Lanyu},
   journal = {Neurocomputing},
-  year = 2025,
+  year = {2025},
+  doi = {10.1016/j.neucom.2025.130417},
+  howpublished = {arXiv:2503.02891},
   comment = {Discusses pruning, quantization for ViTs and notes these techniques are critical for efficient ViT deployment on hardware accelerators.}
 }
 @online{ceva2023transformer_npu,
@@ -170,9 +171,10 @@
 }
 @book{zhang2021d2l,
   title = {Dive into Deep Learning},
-  author = {Zhang, Aston and Lipton, Zachary and Li, Mu and Smola, Alexander},
-  year = 2021,
+  author = {Zhang, Aston and Lipton, Zachary C. and Li, Mu and Smola, Alexander J.},
+  year = {2023},
   publisher = {Cambridge University Press},
+  url = {https://d2l.ai},
   note = {Section 11.5 shows that multi-head attention is implemented by splitting and transposing tensors for parallel computation of heads, confirming the throughput benefit of parallel heads.}
 }
 @article{ba2016layernorm,
@@ -184,10 +186,11 @@
 }
 @article{dorszewski2025concepts_vit,
   title = {From Colors to Classes: Emergence of Concepts in Vision Transformers},
-  author = {Dorszewski, Teresa and Tetkova, Lenka and et al.},
-  journal = {Proc. World Conf. on XAI},
-  year = 2025,
-  note = {Uses neuron-labeling to show ViTs learn increasing concept complexity across layers: early layers capture colors/textures, while later layers encode object-level semantics. Highlights that deeper ViT layers correspond to higher-level concepts (objects, classes).}
+  author = {Dorszewski, Teresa and T{\v{e}}tkov{\'a}, Lenka and Jenssen, Robert and Hansen, Lars Kai and Wickstr{\o}m, Kristoffer Knutsen},
+  journal = {Proc. 3rd World Conf. on Explainable Artificial Intelligence (xAI)},
+  year = {2025},
+  howpublished = {arXiv:2503.24071},
+  note = {Uses neuron-labeling to show ViTs learn increasing concept complexity across layers: early layers capture colors/textures, while later layers encode object-level semantics.}
 }
 @inproceedings{ranftl2021dpt,
   title = {Vision Transformers for Dense Prediction},
@@ -205,17 +208,18 @@
 }
 @article{ignatov2021ai_benchmark,
   title = {AI Benchmark: Running Deep Neural Networks on Android Smartphones},
-  author = {Ignatov, Andrey and et al.},
+  author = {Ignatov, Andrey and Timofte, Radu and Chou, William and Wang, Ke and Wu, Max and Hartley, Tim and Van Gool, Luc},
   journal = {ECCV Workshops},
-  year = 2021,
-  note = {Shows ResNet-50 performance on mobile NPUs. Reports that with INT8 quantization, a Snapdragon NPU can achieve real-time inference (e.g., 5–10 ms per image) for ResNet-50, enabling >100 FPS on device.}
+  year = {2019},
+  howpublished = {arXiv:1810.01109},
+  note = {Shows ResNet-50 performance on mobile NPUs. Reports that with INT8 quantization, a Snapdragon NPU can achieve real-time inference for ResNet-50, enabling >100 FPS on device.}
 }
 @misc{android2025optimization,
   title = {Hardware Optimization on Android for Inference of AI Models},
-  author = {Rivero, Javier and et al.},
+  author = {Gherasim, Iulius and Garc{\'i}a S{\'a}nchez, Carlos},
   howpublished = {arXiv:2511.13453},
-  year = 2025,
-  note = {Evaluates ResNet-50 on a Snapdragon 8 Gen2 tablet. Finds the dedicated NPU achieves superior speed for ResNet-50 (INT8) compared to CPU/GPU:. Table IX shows minimal accuracy loss after quantization (~0.3–0.4%), demonstrating ResNet-50 can run in real time on mobile NPUs after quantization.}
+  year = {2025},
+  note = {Evaluates ResNet-50 on a Snapdragon 8 Gen2 tablet. Finds the dedicated NPU achieves superior speed for ResNet-50 (INT8) compared to CPU/GPU. Table IX shows minimal accuracy loss after quantization (~0.3--0.4\%), demonstrating ResNet-50 can run in real time on mobile NPUs after quantization.}
 }
 @online{ambient2025training_vs_inference,
   title = {Training vs Inference: Training Teaches, Inference Delivers},
@@ -231,11 +235,13 @@
   publisher = {Harvard University},
   note = {1) Explains that traditionally, training is done centrally on big data/cloud and only inference is done on devices. Implies that in most real scenarios, especially for large models, training occurs on servers, not directly on edge devices. 2) Notes that traditionally there is a “clear division” where models are trained in the cloud and then deployed to devices in a static inference-only mode. Early embedded ML systems adhered to this, focusing on low-latency inference of pretrained models on-device. 3) Discusses that on-device learning is typically used for personalization or incremental updates. It emphasizes fine-tuning small parts of the model to user-specific data and mentions growing interest in hardware/software support for such limited ODL tasks. 4) Discusses methods to enable on-device learning under constraints. Mentions reducing stored gradients/optimizer state and only updating a small subset of parameters so that training becomes feasible on limited hardware. Also references mixed precision and sparse update techniques as ways to minimize on-device computation.}
 }
-@article{lu2025ondevice_training_survey,
-  title = {On-Device Training: A First Overview on Existing Systems},
-  author = {Lu, Jinming and Tian, Jiayi and Li, Hai and Zhang, Zheng},
-  journal = {arXiv:2309.16337},
-  year = 2025,
+@article{zhu2024ondevice_training_survey,
+  title = {On-device Training: A First Overview on Existing Systems},
+  author = {Zhu, Shuai and Voigt, Thiemo and Ko, JeongGil and Rahimian, Fatemeh},
+  journal = {ACM Transactions on Sensor Networks},
+  year = {2024},
+  doi = {10.1145/3696003},
+  howpublished = {arXiv:2212.00824},
   note = {Highlights the appeal of on-device training for privacy/personalization but also the severe resource constraints. Mentions that edge platforms face “significant challenges due to the intensive computational and memory demands” of training, especially for large models like transformers.}
 }
 @article{nadalini2025odl_tiny,
@@ -247,9 +253,9 @@
 }
 @inproceedings{houlsby2019adapter,
   title = {Parameter-Efficient Transfer Learning for NLP},
-  author = {Houlsby, Neil and et al.},
-  booktitle = {ICML},
-  year = 2019,
+  author = {Houlsby, Neil and Giurgiu, Andrei and Jastrzebski, Stanislaw and Morrone, Bruna and de Laroussilhe, Quentin and Gesmundo, Andrea and Attariyan, Mona and Gelly, Sylvain},
+  booktitle = {Proceedings of the 36th International Conference on Machine Learning (ICML)},
+  year = {2019},
   note = {Introduces adapter modules to fine-tune only a few new parameters instead of the whole model. This significantly reduces on-device training cost. Such parameter-efficient fine-tuning aligns with limiting trainable parameters for on-device adaptation.}
 }
 @misc{hinton2015distillation,
@@ -316,8 +322,8 @@
   author    = {Navin Ranjan and Andreas Savakis},
   title     = {{Mix-QViT: Mixed-Precision Vision Transformer Quantization Driven by Layer Importance and Quantization Sensitivity}},
   journal   = {arXiv preprint arXiv:2501.06357},
-  year      = {2024},
-  note      = {Observes that in ViTs, operations like LayerNorm and Softmax are **“highly sensitive to quantization”**, causing large accuracy drops if quantized.}
+  year      = {2025},
+  note      = {Observes that in ViTs, operations like LayerNorm and Softmax are highly sensitive to quantization, causing large accuracy drops if quantized.}
 }
 @misc{IBM2023QAT,
   author       = {{IBM Cloud Education}},
@@ -343,12 +349,13 @@
   year      = {2023},
   note      = {Notes that unstructured (weight-level) pruning yields sparse kernels that **require special hardware/software support** to realize speedups.}
 }
-@article{Park2023PTPrune,
-  author    = {Woosuk Park and Saehoon Kim \emph{et al.}},
+@inproceedings{Park2023PTPrune,
+  author    = {Kwon, Woosuk and Kim, Sehoon and Mahoney, Michael W. and Hassoun, Joseph and Keutzer, Kurt and Gholami, Amir},
   title     = {{A Fast Post-Training Pruning Framework for Transformers}},
-  journal   = {arXiv:2305.17547},
-  year      = {2023},
-  note      = {Reviews structured transformer pruning: both fine-grained (weights) and coarse-grained, including **pruning heads, reducing FFN filters, and dropping entire layers**.}
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2022},
+  howpublished = {arXiv:2204.09656},
+  note      = {Reviews structured transformer pruning: both fine-grained (weights) and coarse-grained, including pruning heads, reducing FFN filters, and dropping entire layers.}
 }
 @article{Ngo2025EdgeInference,
   author    = {Dat Ngo and Hyun-Cheol Park and Bongsoon Kang},
@@ -359,4 +366,19 @@
   pages     = {2495},
   year      = {2025},
   note      = {Stresses that real speed/efficiency gains from quantization/pruning depend on hardware/software support – e.g., some accelerators natively support INT8, but not arbitrary sparsity.}
+}
+
+@inproceedings{liu2023efficientvit,
+  author    = {Liu, Xinyu and Peng, Houwen and Zheng, Ningxin and Yang, Yuqing and Hu, Han and Yuan, Yixuan},
+  title     = {{EfficientViT}: Memory Efficient Vision Transformer with Cascaded Group Attention},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2305.07027}
+}
+
+@inproceedings{vasu2023fastvit,
+  author    = {Pavan Kumar Anasosalu Vasu and James Gabriel and Jeff Zhu and Oncel Tuzel and Anurag Ranjan},
+  title     = {{FastViT}: A Fast Hybrid Vision Transformer Using Structural Reparameterization},
+  booktitle = {IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year      = {2023}
 }

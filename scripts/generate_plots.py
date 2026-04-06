@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "scalable_vits_for_embedded_systems", "images")
+OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "docs", "scalable_vits_for_embedded_systems", "figures")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "inference_results")
 
 plt.rcParams.update({

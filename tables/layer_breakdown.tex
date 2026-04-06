@@ -1,0 +1,26 @@
+\begin{table}[t]
+\centering
+\caption{Per-layer time breakdown (FP16, TensorRT on Jetson Orin Nano).
+``FFN All'' includes both fused FFN and unfused linear layers.}
+\label{tab:layer-breakdown}
+\footnotesize
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r r}
+\toprule
+Model & Total (ms) & Attn (\%) & FFN All (\%) & Norm (\%) & Conv/Embed (\%) & Other (\%) \\
+\midrule
+DeiT3-B & 3.16 & 7.0 & 82.5 & 6.4 & 3.8 & 0.3 \\
+deit3_base_kd_petalface & 3.21 & 7.0 & 82.6 & 6.3 & 3.8 & 0.3 \\
+deit3_base_pruned_heads10 & 3.14 & 7.0 & 81.7 & 6.7 & 3.7 & 0.8 \\
+DeiT3-M & 2.14 & 9.1 & 72.9 & 12.1 & 5.4 & 0.5 \\
+DeiT3-S & 1.72 & 12.1 & 68.2 & 13.7 & 5.4 & 0.6 \\
+ResNet-101 & 2.27 & 0.0 & 0.0 & 0.0 & 98.9 & 1.1 \\
+ResNet-200 & 3.89 & 0.0 & 0.0 & 0.0 & 99.3 & 0.7 \\
+ResNet-50 & 1.31 & 0.0 & 0.0 & 0.0 & 98.2 & 1.8 \\
+Swin-B & 4.52 & 26.8 & 56.1 & 11.0 & 5.7 & 0.4 \\
+Swin-S & 4.87 & 27.0 & 54.7 & 12.9 & 5.0 & 0.4 \\
+Swin-T & 2.27 & 30.3 & 49.5 & 11.8 & 7.5 & 0.9 \\
+swin_tiny_kd_cvlface & 1.93 & 30.5 & 48.6 & 12.5 & 7.5 & 0.9 \\
+swin_tiny_pruned_blocks2 & 1.70 & 31.0 & 47.7 & 11.9 & 8.3 & 1.1 \\
+\bottomrule
+\end{tabular*}
+\end{table}

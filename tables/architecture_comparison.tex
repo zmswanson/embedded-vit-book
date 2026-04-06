@@ -1,0 +1,34 @@
+\begin{table}[t]
+\centering
+\caption{Baseline architecture comparison on TinyFace ($96\times96$). Models sorted by family.
+All use ImageNet-1k pretrained weights from \texttt{timm}.}
+\label{tab:architecture-comparison}
+\footnotesize
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l r r c}
+\toprule
+Model & Family & Params (M) & Embed Dim & Rank@1 \\
+\midrule
+DeiT3-B & DeiT3 & 85.8 & 768 & 0.5834 \\
+DeiT3-M & DeiT3 & 38.3 & 512 & 0.5703 \\
+DeiT3-S & DeiT3 & 21.7 & 384 & 0.5515 \\
+\midrule
+Swin-T & Swin & 27.5 & 768 & 0.5617 \\
+Swin-S & Swin & 48.8 & 768 & 0.5534 \\
+Swin-B & Swin & 86.7 & 1024 & 0.5504 \\
+\midrule
+ConvNeXt-T & ConvNeXt & 27.8 & 768 & 0.5317 \\
+ConvNeXt-S & ConvNeXt & 49.5 & 768 & 0.5370 \\
+ConvNeXt-B & ConvNeXt & 87.6 & 1024 & 0.5427 \\
+\midrule
+PVT-v2-B2 & PVT & 25.4 & 512 & 0.5421 \\
+PVT-v2-B3 & PVT & 45.2 & 512 & 0.5429 \\
+PVT-v2-B5 & PVT & 81.4 & 512 & 0.5467 \\
+\midrule
+MobileViT-v2 & MobileViT & 17.4 & 512 & 0.5429 \\
+\midrule
+ResNet-50 & ResNet & 23.5 & 2048 & 0.4764 \\
+ResNet-101 & ResNet & 42.5 & 2048 & 0.4973 \\
+ResNet-200 & ResNet & 62.6 & 2048 & 0.4678 \\
+\bottomrule
+\end{tabular*}
+\end{table}

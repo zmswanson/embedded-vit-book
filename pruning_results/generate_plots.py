@@ -10,7 +10,7 @@ import re
 
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
 IMG_DIR = os.path.join(os.path.dirname(OUT_DIR),
-                       "docs", "scalable_vits_for_embedded_systems", "images")
+                       "docs", "scalable_vits_for_embedded_systems", "figures")
 os.makedirs(IMG_DIR, exist_ok=True)
 
 # ── Load data ────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ compression = pd.read_csv(os.path.join(OUT_DIR, "compression_analysis.csv"))
 
 
 def save(fig, name):
-    """Save to both pruning_results/ and docs images/."""
+    """Save to both pruning_results/ and docs figures/."""
     fig.savefig(os.path.join(OUT_DIR, name), dpi=150, bbox_inches="tight")
     fig.savefig(os.path.join(IMG_DIR, name.replace(".png", ".pdf")),
                 bbox_inches="tight")

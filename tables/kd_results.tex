@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\caption{Knowledge distillation results (rank-1) compared to standalone training.
+Best Phase~1 refers to the better of baseline or LoRA for each model.
+The best KD result across all teacher configurations is shown.
+Default $\alpha=0.7$.}
+\label{tab:kd-comparison}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c l c}
+\toprule
+Model & Phase 1 & Best KD & Best Config & $\Delta$ \\
+\midrule
+Swin-T & 0.562 & 0.567 & PETALface frozen, LoRA & +0.005 \\
+Swin-S & 0.554 & 0.559 & CVLFace FT, LoRA & +0.004 \\
+Swin-B & 0.536 & 0.536 & CVLFace FT, Direct & +0.000 \\
+DeiT3-S & 0.552 & 0.543 & CVLFace frozen, Direct & $-$0.009 \\
+DeiT3-M & 0.570 & 0.559 & CVLFace FT, Direct & $-$0.011 \\
+DeiT3-B & 0.583 & 0.581 & CVLFace FT, Direct & $-$0.003 \\
+\bottomrule
+\end{tabular*}
+\end{table}

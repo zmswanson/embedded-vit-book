@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{LoRA vs.\ full fine-tuning on TinyFace. LoRA consistently improves Swin
+but degrades DeiT-3 performance, revealing architecture-dependent response.}
+\label{tab:lora-results}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c}
+\toprule
+Model & Baseline Rank@1 & LoRA Rank@1 & $\Delta$ \\
+\midrule
+Swin-T & 0.5340 & 0.5620 & +0.028 \\
+Swin-S & 0.5390 & 0.5540 & +0.015 \\
+Swin-B & 0.5260 & 0.5360 & +0.010 \\
+DeiT3-S & 0.5520 & 0.5270 & $-$0.025 \\
+DeiT3-M & 0.5700 & 0.5330 & $-$0.037 \\
+DeiT3-B & 0.5830 & 0.5500 & $-$0.033 \\
+\bottomrule
+\end{tabular*}
+\end{table}
