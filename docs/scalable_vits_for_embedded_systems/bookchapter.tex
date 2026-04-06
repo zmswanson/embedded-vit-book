@@ -572,6 +572,99 @@ Figure~\ref{fig:pruning-method} compares pruning strategies across all four arch
 \paragraph{Compression--accuracy trade-off summary.}
 Across the full pruning$\times$quantization space, several Pareto-optimal configurations emerge. For absolute accuracy, DeiT3-B KD ($\alpha{=}0.1$) with 10\% head pruning at INT8 achieves 0.591 rank-1 at 82\,MB ($4.0\times$ compression), preserving nearly all accuracy. For small models, Swin-T KD ($\alpha{=}0.0$) with 2 blocks removed at INT8 delivers 0.583 rank-1 at just 24.6\,MB---retaining 94.6\% of the unpruned KD model's accuracy in a package suitable for edge devices. For maximum compression with competitive accuracy, Swin-B with 5 blocks removed at INT8 delivers 0.554 rank-1 at 71.2\,MB ($4.7\times$), outperforming the unpruned Swin-B baseline. DeiT3-S at 10\% heads, INT8 achieves 0.565 rank-1 at 21.7\,MB ($3.8\times$), the smallest model that exceeds its unpruned counterpart. FP16 quantization is consistently lossless across all pruned models, and INT8 introduces at most 1\,pp of additional degradation (typically $<$0.1\,pp), confirming that pruning and quantization compose well.
 
+\subsection{On-Device Inference and TensorRT Compatibility}\label{sec:trt-compat}
+
+All trained models were deployed to an NVIDIA Jetson Orin Nano (8\,GB, JetPack 6.4, TensorRT 10.3, CUDA 12.6, SM compute capability 8.7) for hardware-in-the-loop latency evaluation. Inference is performed at batch size 1 with fixed $96\times96$ input resolution, reflecting a realistic single-image query scenario in a surveillance or access-control system.
+
+\paragraph{TRT Conversion Results.}
+For the primary Swin and DeiT-3 model families, along with ResNet baselines, ONNX graphs exported at opset 18 were converted directly to TensorRT FP32 and FP16 engines using \texttt{trtexec}. Table~\ref{tab:trt-latency-supported} summarizes the resulting inference latencies.
+
+\begin{table}[t]
+    \centering
+    \caption{TensorRT inference latency (mean ms, batch size 1, $96\times96$ input) for natively TRT-compatible models on the Jetson Orin Nano. FP16 consistently achieves $1.7$--$2.1\times$ speedup over FP32 for transformer models due to Tensor Core utilization.}
+    \label{tab:trt-latency-supported}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c}
+        \toprule
+        Model & Params & TRT FP32 (ms) & TRT FP16 (ms) \\
+        \midrule
+        Swin-Tiny  & 27.5\,M & 1.72 & 1.38 \\
+        Swin-Small & 49.6\,M & 5.40 & 3.01 \\
+        Swin-Base  & 86.7\,M & 7.56 & 3.95 \\
+        DeiT3-Small   & 21.7\,M & 2.55 & 1.38 \\
+        \bottomrule
+    \end{tabular*}
+\end{table}
+
+\paragraph{Architecturally Incompatible Models.}
+Seven of the evaluated architectures---ConvNeXt-T/S/B, PVT-v2-B2/B3/B5, and MobileViT-v2-200---failed \texttt{trtexec} conversion entirely with the error:
+
+\begin{quote}
+\texttt{Could not find any implementation for node \{ForeignNode[Transpose $\cdots$ Transpose]\}.}
+\end{quote}
+
+The root cause is a normalization pattern unique to these architectures. In standard ViTs like Swin and DeiT-3, layer normalization is applied to $(B,N,C)$ token sequences, which maps naturally to TensorRT's native \texttt{LayerNormalization} kernel along the channel axis. ConvNeXt and PVT-v2, however, apply layer normalization to NCHW spatial feature maps. In timm's implementation, this is realized by permuting the tensor to NHWC format, applying \texttt{F.layer\_norm}, then permuting back: \texttt{Transpose(0,2,3,1) $\rightarrow$ LayerNorm $\rightarrow$ Transpose(0,3,1,2)}. MobileViT-v2 uses an analogous \texttt{GroupNorm(num\_groups=1)}, which normalizes across all non-batch spatial dimensions and incurs the same layout issues.
+
+TensorRT 10.3 on SM 8.7 contains no kernel that implements \texttt{LayerNormalization} on 4-D NCHW feature maps in either FP32 or FP16. The entire Transpose + normalize + Transpose pattern is fused by TRT's Myelin compiler backend into a placeholder \texttt{ForeignNode} for which no device implementation exists, causing conversion to abort.
+
+\paragraph{Approaches Attempted and Why They Failed.}
+Six different export strategies were systematically tested in an attempt to produce a natively TRT-compatible graph:
+
+\begin{enumerate}
+    \item \textbf{ONNX opset 14 (decomposed LayerNorm)}: The default decomposition replaces \texttt{LayerNormalization} with primitive arithmetic (ReduceMean, Sub, Pow, Sqrt, Div, Mul, Add). Despite eliminating the high-level norm op, TRT's Myelin backend fuses the resulting arithmetic subgraph back into a ForeignNode with tactic ID 0x0.
+
+    \item \textbf{ONNX opset 17 (native \texttt{LayerNormalization} on 4D NCHW)}: The legacy TorchScript exporter at opset 17 preserves the \texttt{LayerNormalization} op but retains the surrounding Transpose pair. TRT could not match any kernel to this \texttt{Transpose $\rightarrow$ LayerNorm $\rightarrow$ Transpose} pattern, even in FP16 mode.
+
+    \item \textbf{ONNX opset 18 dynamo exporter (native \texttt{LayerNormalization} on reshaped 3D tensor)}: The dynamo exporter rewrites the normalization as a reshape-based operation that presents TRT with standard $(B,HW,C)$ token norms. However, the dynamo exporter introduces \texttt{SequenceEmpty} and \texttt{Loop} operators (from dynamic shape handling) that TRT 10.3 cannot parse, aborting before the engine build begins.
+
+    \item \textbf{ConvNeXt \texttt{conv\_mlp=True} variant}: timm's ConvNeXt supports an alternative MLP implementation that replaces Linear projections with $1\!\times\!1$ Conv2d, retaining NCHW throughout. However, the implementation internally still uses \texttt{LayerNorm2d}, which performs the same NHWC permutation. This eliminates the MLP-related Transposes but leaves the normalization Transposes intact.
+
+    \item \textbf{Custom \texttt{TRTLayerNorm2d} (NCHW dim=1 normalization)}: A custom module normalized over channel dimension 1 directly on NCHW tensors, entirely eliminating Transpose operators. TRT's Myelin still fused the resulting ReduceMean chain into a ForeignNode, indicating that the hardware limitation is not a graph structure issue but a missing SM 8.7 kernel for any form of non-$(B,N,C)$ LayerNorm.
+
+    \item \textbf{Post-hoc ONNX graph surgery}: The \texttt{onnx-graphsurgeon} library (v0.5.8) was used to attempt pattern-matching the decomposed norm subgraph and fusing it back into a \texttt{LayerNormalization} op at opset 17. The approach was conceptually correct but blocked by a version incompatibility between \texttt{onnx-graphsurgeon} 0.5.8 and the installed \texttt{onnx} library (\texttt{AttributeError: module 'onnx.helper' has no attribute 'float32\_to\_bfloat16'}).
+\end{enumerate}
+
+\paragraph{ONNX Runtime TensorRT Execution Provider.}
+The working solution is ONNX Runtime's TensorRT Execution Provider (TRT EP), which performs \emph{automatic sub-graph partitioning}: it builds TRT engines for the subgraphs TRT can handle (convolutions, matrix multiplications, activations, pooling) and routes the remaining nodes to the CUDA Execution Provider. This avoids the hard failure that occurs when \texttt{trtexec} attempts to compile the full graph as a single TRT engine, while still delivering meaningful GPU acceleration for the computationally dominant operations.
+
+Table~\ref{tab:trt-ep-latency} presents the benchmark results obtained via ONNX Runtime TRT EP (FP32 and FP16 engines, batch size 1, 50-iteration warm-up, 200-iteration timing) alongside CUDA-only EP results as a baseline.
+
+\begin{table}[t]
+    \centering
+    \caption{Inference latency (mean ms, batch size 1) for architecturally TRT-incompatible models on the Jetson Orin Nano, measured using ONNX Runtime TRT Execution Provider (auto-partitioned) and CUDA EP. TRT EP achieves $1.2$--$2.7\times$ speedup over CUDA-only, increasing with model size. FP16 provides additional gains of $10$--$34\%$ over TRT FP32 for larger models. Speedup is computed as CUDA FP32 / TRT EP FP32.}
+    \label{tab:trt-ep-latency}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c c}
+        \toprule
+        Model & Params & TRT EP FP32 & TRT EP FP16 & CUDA FP32 & Speedup \\
+        \midrule
+        ConvNeXt-T & 28.6\,M & 4.12\,ms & 4.53\,ms & 4.92\,ms & 1.19$\times$ \\
+        ConvNeXt-S & 50.2\,M & 6.21\,ms & 5.86\,ms & 8.22\,ms & 1.32$\times$ \\
+        ConvNeXt-B & 87.6\,M & 8.70\,ms & 5.58\,ms & 11.59\,ms & 1.33$\times$ \\
+        PVT-v2-B2  & 25.4\,M & 6.41\,ms & 5.42\,ms & 10.54\,ms & 1.64$\times$ \\
+        PVT-v2-B3  & 45.2\,M & 8.28\,ms & 7.33\,ms & 18.65\,ms & 2.25$\times$ \\
+        PVT-v2-B5  & 82.0\,M & 14.19\,ms & 11.66\,ms & 38.21\,ms & 2.69$\times$ \\
+        MobileViT-v2-200 & 18.4\,M & 5.29\,ms & 5.05\,ms & 7.38\,ms & 1.40$\times$ \\
+        \bottomrule
+    \end{tabular*}
+\end{table}
+
+\paragraph{Key Findings and Implications for Practitioners.}
+
+Several lessons emerge from this experience that are directly relevant to embedded deployment of vision transformers:
+
+\emph{Not all vision backbone architectures are TRT-compatible.} Models that apply layer normalization directly to NCHW spatial feature maps---rather than to flattened token sequences---may fail standalone TRT conversion entirely, even if they run correctly in ONNX Runtime with the CUDA execution provider. This is not limited to older architectures: ConvNeXt (2022), PVT-v2 (2021), and MobileViT-v2 (2022) all exhibit this behavior on the tested hardware.
+
+\emph{The specific failure mode is a ForeignNode with tactic ID 0.} When \texttt{trtexec} reports \texttt{Could not find any implementation for node \{ForeignNode[\ldots]\}} together with a warning about tactic 0x0 being skipped due to insufficient memory, the root cause is almost always a missing hardware kernel---not a memory budget issue. Increasing \texttt{--memPoolSize} will not resolve this.
+
+\emph{Neither decomposing the operator to primitives nor upgrading the opset resolves the kernel gap.} TRT's Myelin compiler will re-fuse decomposed LayerNorm arithmetic (opset 14) back into the same ForeignNode pattern it cannot execute. Upgrading to opset 17 or 18 to preserve the \texttt{LayerNormalization} high-level op does not help if the tensor layout requires surrounding Transpose operators that TRT also cannot kernel.
+
+\emph{ONNX Runtime TRT EP (with \texttt{TensorrtExecutionProvider} + \texttt{CUDAExecutionProvider}) is the practical solution.} The auto-partitioning strategy achieves $1.2$--$2.7\times$ speedup relative to CUDA-only inference. Speedup scales with model size and with the fraction of the graph handled by TRT: large PVT-v2 models benefit most (PVT-v2-B5 improves from 38.2\,ms to 14.2\,ms FP32) because their dominant compute---spatial-reduction attention, $1\times1$ projections, and MLP MatMuls---is entirely TRT-accelerated. The normalization overhead, though not TRT-accelerated, represents a small fraction of total compute in larger models.
+
+\emph{The latency overhead of using TRT EP versus native TRT is architecture-dependent.} For reference, the natively TRT-accelerated Swin-Tiny achieves 1.72\,ms at FP32 and 1.38\,ms at FP16. ConvNeXt-Tiny under TRT EP runs at 4.12\,ms FP32---a $2.4\times$ gap despite comparable parameter counts (27.5\,M vs.\ 28.6\,M). This gap is attributable to the normalization fallback and to wasted graph partitioning overhead, not to architectural quality. It also confirms a practical advantage for TRT-native architectures (Swin, DeiT-3) when deploying on NVIDIA embedded platforms.
+
+\emph{FP16 precision provides further latency gains on top of sub-graph partitioning.} For larger models where TRT handles the bulk of compute, FP16 reduces latency by 16\%--34\% (ConvNeXt-B: 8.70\,ms $\to$ 5.58\,ms; PVT-v2-B5: 14.19\,ms $\to$ 11.66\,ms), consistent with the $1.7$--$2.1\times$ FP16 speedup observed for natively TRT-compatible models. Practitioners targeting embedded deployment should therefore always benchmark FP16 as a default configuration.
+
+\emph{ONNX Runtime dynamic INT8 quantization is counterproductive on GPU for these architectures.} We also benchmarked the pre-quantized INT8 ONNX models (exported via \texttt{quantize\_dynamic}) through the CUDA Execution Provider. The results were uniformly worse than FP32, with ConvNeXt-T degrading from 5.98\,ms to 50.5\,ms and PVT-v2-B5 from 46.8\,ms to 306\,ms---an $8$--$15\times$ \emph{slowdown}. The single exception was MobileViT-v2-200 (19.3\,ms $\to$ 9.4\,ms speedup), attributable to its predominantly linear attention ops being weight-bandwidth-bound rather than activation-bound. The core issue is that \texttt{quantize\_dynamic} is a CPU-optimization technique: weights are stored as INT8 to reduce memory transfer bandwidth, but are \emph{dequantized to FP32 before execution}. On GPU, where FP32 throughput is already high and the dequantize kernel adds latency, this is strictly worse than leaving weights in FP32. Genuine INT8 GPU acceleration requires operator-level INT8 tensor core execution, which is only available through TRT's native calibration-based PTQ (\texttt{trtexec --int8}). Practitioners should not apply ONNX dynamic INT8 quantization to models intended for GPU (CUDA EP or TRT EP) deployment.
+
 \subsection{Summary and Implications for Embedded Deployment}
 
 Table~\ref{tab:overall-summary} consolidates the best results across all experimental phases.
