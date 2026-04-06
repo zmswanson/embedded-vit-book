@@ -1,0 +1,2 @@
+model,precision,rank1,pytorch_ref,delta,status
+convnext_base,fp32,0.5427,0.5427,0.0,PASS
