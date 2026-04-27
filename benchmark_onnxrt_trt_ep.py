@@ -119,6 +119,14 @@ def main():
     parser.add_argument("--ep", choices=["trt", "cuda", "both"], default="both",
                         help="Execution provider(s) to benchmark")
     parser.add_argument("--trt-cache-dir", default="/tmp/trt_ep_cache")
+    parser.add_argument("--power-mode-label", default=None,
+                        help="Optional label tagged onto every result row (e.g. MAXN_SUPER, 15W).")
+    parser.add_argument("--power-mode-id", default=None,
+                        help="Optional numeric mode ID tagged onto every result row.")
+    parser.add_argument("--wattage-budget", default=None,
+                        help="Optional wattage budget tagged onto every result row.")
+    parser.add_argument("--append", action="store_true",
+                        help="Append rows to --output instead of overwriting (header only on create).")
     args = parser.parse_args()
 
     eps_to_test = ["trt", "cuda"] if args.ep == "both" else [args.ep]
@@ -217,17 +225,35 @@ def main():
                     "error": str(e),
                 })
 
+    # Tag rows with power-mode metadata if provided
+    if args.power_mode_label is not None or args.power_mode_id is not None or args.wattage_budget is not None:
+        for r in results:
+            if args.power_mode_id is not None:
+                r["power_mode_id"] = args.power_mode_id
+            if args.power_mode_label is not None:
+                r["power_mode_label"] = args.power_mode_label
+            if args.wattage_budget is not None:
+                r["wattage_budget"] = args.wattage_budget
+
     # Write CSV
     if results:
         fieldnames = ["model", "ep", "precision", "mean_ms", "std_ms",
                       "p50_ms", "p90_ms", "p99_ms", "min_ms", "max_ms"]
+        if args.power_mode_id is not None:
+            fieldnames.append("power_mode_id")
+        if args.power_mode_label is not None:
+            fieldnames.append("power_mode_label")
+        if args.wattage_budget is not None:
+            fieldnames.append("wattage_budget")
         if any("error" in r for r in results):
             fieldnames.append("error")
-        with open(args.output, "w", newline="") as f:
+        append_mode = args.append and os.path.exists(args.output)
+        with open(args.output, "a" if append_mode else "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            writer.writeheader()
+            if not append_mode:
+                writer.writeheader()
             writer.writerows(results)
-        print(f"\nResults saved to {args.output}")
+        print(f"\nResults saved to {args.output} ({'appended' if append_mode else 'written'})")
 
     # Print summary table
     print(f"\n{'='*80}")
