@@ -370,28 +370,38 @@ Architecture & Variant & Pruning & Params (M) & Rank@1 & Compression \\
 
 
 # ═════════════════════════════════════════════════════════════════════
-# TABLE 6: Jetson Inference — TRT-native baselines
+# TABLE 6: Jetson Inference — UNIFIED native TensorRT (all 16 models)
 # ═════════════════════════════════════════════════════════════════════
 def table_jetson_benchmarks():
-    df = pd.read_csv(os.path.join(RESULTS_DIR, "trt_benchmark.csv"))
-    baselines = df[df["category"] == "baselines"].copy()
+    # Unified TRT-native FP32/FP16 sweep (Phase 7.3) covers all 16 baselines,
+    # including ConvNeXt / PVT-v2 / MobileViT-v2 via export_trt_compat.py.
+    uni = pd.read_csv(os.path.join(RESULTS_DIR, "trt_unified_all16.csv"))
+    uni = uni[uni["mean_ms"].notna()].copy()
 
-    # Pivot: model → fp32, fp16, int8
-    models_seen = []
+    # INT8 numbers still come from the earlier TRT-native PTQ sweep
+    # (only available for the 9 originally-compatible models).
+    legacy = pd.read_csv(os.path.join(RESULTS_DIR, "trt_benchmark.csv"))
+    legacy_int8 = legacy[(legacy["category"] == "baselines") &
+                         (legacy["precision"] == "int8")].copy()
+
     model_data = {}
-    for _, r in baselines.iterrows():
-        m = r["model"]
-        p = r["precision"]
-        pretty = SHORT_PRETTY.get(m, m)
-        if pretty not in model_data:
-            model_data[pretty] = {}
-            models_seen.append(pretty)
-        model_data[pretty][p] = (r["mean_ms"], r["throughput_fps"])
+    for _, r in uni.iterrows():
+        pretty = SHORT_PRETTY.get(r["model"], r["model"])
+        model_data.setdefault(pretty, {})[r["precision"]] = (
+            r["mean_ms"], r["throughput_fps"])
+    for _, r in legacy_int8.iterrows():
+        pretty = SHORT_PRETTY.get(r["model"], r["model"])
+        model_data.setdefault(pretty, {})["int8"] = (
+            r["mean_ms"], r["throughput_fps"])
 
     header = r"""\begin{table}[t]
 \centering
-\caption{TensorRT inference latency on the Jetson Orin Nano (batch size 1, $96\times96$ input).
-Models natively compatible with TRT. INT8 uses TRT's built-in PTQ calibration.}
+\caption{Unified native TensorRT inference latency on the Jetson Orin Nano
+(batch size 1, $96\times96$ input, MAXN\_SUPER, locked clocks). All sixteen
+baseline architectures execute as native TRT engines via the
+\texttt{export\_trt\_compat.py} rewrites. INT8 uses TRT's built-in PTQ
+calibration and is reported only for the nine originally TRT-compatible
+models.}
 \label{tab:jetson-latency-full}
 \footnotesize
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r r}
@@ -429,9 +439,17 @@ Model & ms & FPS & ms & FPS & ms & FPS \\
 
 
 # ═════════════════════════════════════════════════════════════════════
-# TABLE 7: Jetson Inference — TRT EP fallback models
+# TABLE 7 (DEPRECATED): TRT EP fallback table superseded by unified table.
+#   Phase 7.3 rewrote the previously-incompatible architectures to
+#   native TRT, so the dual-harness presentation is no longer needed.
+#   Kept as a no-op so the orchestration call site keeps working.
 # ═════════════════════════════════════════════════════════════════════
 def table_jetson_trt_ep():
+    # No-op — see table_jetson_benchmarks() for the unified 16-model table.
+    return
+
+
+def _table_jetson_trt_ep_legacy():
     df = pd.read_csv(os.path.join(RESULTS_DIR, "jetson_benchmark_all.csv"))
     ep = df[(df["backend"] == "ONNXRT_TRT_EP") & (df["category"] == "baselines")].copy()
     # Also get CUDA baselines for comparison
@@ -585,16 +603,9 @@ def plot_layer_breakdown():
 # FIGURE: Latency comparison bar chart — all baselines FP32/FP16/INT8
 # ═════════════════════════════════════════════════════════════════════
 def plot_latency_comparison():
-    # TRT-native models
-    trt = pd.read_csv(os.path.join(RESULTS_DIR, "trt_benchmark.csv"))
-    trt_bl = trt[trt["category"] == "baselines"].copy()
-
-    # TRT EP models
-    jall = pd.read_csv(os.path.join(RESULTS_DIR, "jetson_benchmark_all.csv"))
-    ep = jall[(jall["backend"] == "ONNXRT_TRT_EP") & (jall["category"] == "baselines")].copy()
-
-    # Combine — only baselines, FP32 and FP16
-    combined = pd.concat([trt_bl, ep], ignore_index=True)
+    # Unified TRT-native sweep covers all 16 baselines (Phase 7.3).
+    uni = pd.read_csv(os.path.join(RESULTS_DIR, "trt_unified_all16.csv"))
+    combined = uni[uni["mean_ms"].notna()].copy()
 
     order = [
         "resnet50d", "resnet101d", "resnet200d",
@@ -604,7 +615,6 @@ def plot_latency_comparison():
         "pvt_v2_b2", "pvt_v2_b3", "pvt_v2_b5",
         "mobilevitv2_200",
     ]
-    # Filter to FP32 and FP16
     combined = combined[combined["precision"].isin(["fp32", "fp16"])]
 
     model_data = {}
@@ -635,7 +645,7 @@ def plot_latency_comparison():
     ax.set_xticks(x)
     ax.set_xticklabels(fig_order, rotation=40, ha="right")
     ax.set_ylabel("Latency (ms)")
-    ax.set_title("Jetson Orin Nano Latency — FP32 vs FP16 (batch size 1, 96×96)")
+    ax.set_title("Jetson Orin Nano Latency — native TensorRT, FP32 vs FP16 (batch size 1, 96×96)")
 
     # Legend for families + precision
     handles = [Patch(facecolor=c, label=f) for f, c in FAMILY_COLORS.items()]
@@ -654,18 +664,12 @@ def plot_latency_comparison():
 def plot_accuracy_vs_latency_pareto():
     baselines = _get_baseline_rank1()
 
-    # TRT-native FP16 latencies
-    trt = pd.read_csv(os.path.join(RESULTS_DIR, "trt_benchmark.csv"))
-    trt_fp16 = trt[(trt["category"] == "baselines") & (trt["precision"] == "fp16")]
-
-    # TRT EP FP16 latencies
-    jall = pd.read_csv(os.path.join(RESULTS_DIR, "jetson_benchmark_all.csv"))
-    ep_fp16 = jall[(jall["backend"] == "ONNXRT_TRT_EP") &
-                   (jall["category"] == "baselines") &
-                   (jall["precision"] == "fp16")]
+    # Unified TRT-native FP16 latencies cover all 16 baselines (Phase 7.3).
+    uni = pd.read_csv(os.path.join(RESULTS_DIR, "trt_unified_all16.csv"))
+    fp16 = uni[(uni["precision"] == "fp16") & uni["mean_ms"].notna()].copy()
 
     points = []  # (pretty, latency_ms, rank1, family)
-    for _, r in pd.concat([trt_fp16, ep_fp16]).iterrows():
+    for _, r in fp16.iterrows():
         pretty = SHORT_PRETTY.get(r["model"], r["model"])
         if pretty in baselines:
             points.append((pretty, r["mean_ms"], baselines[pretty], family_of(pretty)))
@@ -703,9 +707,9 @@ def plot_accuracy_vs_latency_pareto():
         plats, pranks = zip(*pareto)
         ax.plot(plats, pranks, "k--", alpha=0.4, linewidth=1.0, zorder=1, label="Pareto frontier")
 
-    ax.set_xlabel("Latency (ms) — FP16, Jetson Orin Nano")
+    ax.set_xlabel("Latency (ms) — FP16, native TensorRT on Jetson Orin Nano")
     ax.set_ylabel("Rank-1 Identification Rate")
-    ax.set_title("Accuracy vs. Latency — Baseline Models (FP16)")
+    ax.set_title("Accuracy vs. Latency — Baseline Models (FP16, unified native TRT)")
     handles = [Patch(facecolor=c, label=f) for f, c in FAMILY_COLORS.items()]
     handles.append(Line2D([0], [0], linestyle="--", color="k", alpha=0.4, label="Pareto"))
     ax.legend(handles=handles, loc="lower right", fontsize=8)

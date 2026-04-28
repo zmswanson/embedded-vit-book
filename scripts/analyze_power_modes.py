@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Phase 7.1 — consolidate Jetson power-mode benchmarks.
+"""Phase 7.3 — consolidate Jetson power-mode benchmarks (unified native TRT).
 
 Reads:
-  inference_results/power_modes/trt_power_sweep.csv
-  inference_results/power_modes/onnxrt_trt_ep_power_sweep.csv
+  inference_results/power_modes/trt_unified_power_sweep.csv
   inference_results/power_modes/tegrastats_<label>.log
   inference_results/final_models_inference_results.csv  (rank@1 reference)
 
@@ -64,7 +63,7 @@ def parse_tegrastats(path: Path) -> dict:
 
 # ---------------------------------------------------------------- load data
 def load_trt() -> pd.DataFrame:
-    df = pd.read_csv(PM_DIR / "trt_power_sweep.csv")
+    df = pd.read_csv(PM_DIR / "trt_unified_power_sweep.csv")
     df["source"] = "trt"
     df["throughput_fps"] = pd.to_numeric(df["throughput_fps"], errors="coerce")
     df["mean_ms"] = pd.to_numeric(df["mean_ms"], errors="coerce")
@@ -93,7 +92,7 @@ def load_rank1() -> dict:
 
 # ---------------------------------------------------------------- main
 def main():
-    long_df = pd.concat([load_trt(), load_ort()], ignore_index=True)
+    long_df = load_trt()
     long_df["power_mode_label"] = pd.Categorical(
         long_df["power_mode_label"], categories=MODE_ORDER, ordered=True
     )
@@ -204,7 +203,7 @@ def main():
     plot_df = summary.copy()
     plot_df["label"] = plot_df["model"] + " (" + plot_df["precision"] + ")"
     # latency bars
-    fig, ax = plt.subplots(figsize=(11, 5))
+    fig, ax = plt.subplots(figsize=(12, 5.5))
     n = len(plot_df)
     x = np.arange(n)
     w = 0.27
@@ -212,10 +211,11 @@ def main():
     for i, label in enumerate(MODE_ORDER):
         ax.bar(x + (i - 1) * w, plot_df[f"mean_ms_{label}"], w, label=label, color=colors[label])
     ax.set_xticks(x)
-    ax.set_xticklabels(plot_df["label"], rotation=60, ha="right", fontsize=8)
-    ax.set_ylabel("Mean inference latency (ms)")
-    ax.set_title("Jetson Orin Nano latency by power mode (batch=1, 96×96)")
-    ax.legend(title="Power mode")
+    ax.set_xticklabels(plot_df["label"], rotation=55, ha="right", fontsize=10)
+    ax.tick_params(axis="y", labelsize=11)
+    ax.set_ylabel("Mean inference latency (ms)", fontsize=12)
+    ax.set_title("Jetson Orin Nano latency by power mode (batch=1, 96×96)", fontsize=13)
+    ax.legend(title="Power mode", fontsize=10, title_fontsize=11)
     ax.grid(axis="y", linestyle=":", alpha=0.5)
     fig.tight_layout()
     fig.savefig(FIG_DIR / "power_mode_latency.pdf")
@@ -223,16 +223,17 @@ def main():
     print(f"Wrote {FIG_DIR / 'power_mode_latency.pdf'}")
 
     # throughput / wattage_budget bars (use the configured budget, capped at 25 for MAXN)
-    fig, ax = plt.subplots(figsize=(11, 5))
+    fig, ax = plt.subplots(figsize=(12, 5.5))
     for i, label in enumerate(MODE_ORDER):
         budget = MODE_BUDGET[label]
         ax.bar(x + (i - 1) * w, plot_df[f"fps_{label}"] / budget, w,
                label=f"{label} (÷{budget}W)", color=colors[label])
     ax.set_xticks(x)
-    ax.set_xticklabels(plot_df["label"], rotation=60, ha="right", fontsize=8)
-    ax.set_ylabel("Throughput / configured budget (FPS / W)")
-    ax.set_title("Jetson Orin Nano throughput-per-watt by power mode")
-    ax.legend(title="Power mode")
+    ax.set_xticklabels(plot_df["label"], rotation=55, ha="right", fontsize=10)
+    ax.tick_params(axis="y", labelsize=11)
+    ax.set_ylabel("Throughput / configured budget (FPS / W)", fontsize=12)
+    ax.set_title("Jetson Orin Nano throughput-per-watt by power mode", fontsize=13)
+    ax.legend(title="Power mode", fontsize=10, title_fontsize=11)
     ax.grid(axis="y", linestyle=":", alpha=0.5)
     fig.tight_layout()
     fig.savefig(FIG_DIR / "power_mode_throughput_per_watt.pdf")

@@ -1,7 +1,11 @@
 \begin{table}[t]
 \centering
-\caption{TensorRT inference latency on the Jetson Orin Nano (batch size 1, $96\times96$ input).
-Models natively compatible with TRT. INT8 uses TRT's built-in PTQ calibration.}
+\caption{Unified native TensorRT inference latency on the Jetson Orin Nano
+(batch size 1, $96\times96$ input, MAXN\_SUPER, locked clocks). All sixteen
+baseline architectures execute as native TRT engines via the
+\texttt{export\_trt\_compat.py} rewrites. INT8 uses TRT's built-in PTQ
+calibration and is reported only for the nine originally TRT-compatible
+models.}
 \label{tab:jetson-latency-full}
 \footnotesize
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l r r r r r r}
@@ -10,15 +14,22 @@ Models natively compatible with TRT. INT8 uses TRT's built-in PTQ calibration.}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
 Model & ms & FPS & ms & FPS & ms & FPS \\
 \midrule
-DeiT3-B & 5.16 & 194 & 2.58 & 388 & 2.57 & 389 \\
-DeiT3-M & 3.07 & 326 & 1.45 & 689 & 1.44 & 693 \\
-DeiT3-S & 1.94 & 514 & 1.05 & 953 & 1.05 & 954 \\
-Swin-T & 2.43 & 412 & 1.33 & 748 & 1.33 & 750 \\
-Swin-S & 4.23 & 236 & 2.33 & 429 & 2.33 & 429 \\
-Swin-B & 6.27 & 159 & 3.11 & 321 & 3.12 & 320 \\
-ResNet-50 & 1.89 & 527 & 0.95 & 1054 & 0.63 & 1594 \\
-ResNet-101 & 3.12 & 321 & 1.66 & 603 & 1.14 & 876 \\
-ResNet-200 & 4.96 & 202 & 2.85 & 350 & 1.96 & 509 \\
+DeiT3-B & 6.73 & 148 & 3.49 & 286 & 2.57 & 389 \\
+DeiT3-M & 3.58 & 279 & 1.92 & 521 & 1.44 & 693 \\
+DeiT3-S & 2.43 & 411 & 1.34 & 743 & 1.05 & 954 \\
+Swin-T & 3.10 & 322 & 1.67 & 598 & 1.33 & 750 \\
+Swin-S & 5.53 & 181 & 2.90 & 344 & 2.33 & 429 \\
+Swin-B & 8.36 & 120 & 4.14 & 241 & 3.12 & 320 \\
+ConvNeXt-T & 3.31 & 302 & 1.95 & 512 & 3.31 & 302 \\
+ConvNeXt-S & 5.84 & 171 & 3.35 & 298 & 5.84 & 171 \\
+ConvNeXt-B & 8.68 & 115 & 4.73 & 211 & 8.68 & 115 \\
+PVT-v2-B2 & 4.18 & 239 & 2.74 & 365 & 4.18 & 239 \\
+PVT-v2-B3 & 6.91 & 145 & 4.37 & 229 & 6.91 & 145 \\
+PVT-v2-B5 & 12.31 & 81 & 7.19 & 139 & 12.31 & 81 \\
+MobileViT-v2 & 3.25 & 307 & 1.90 & 526 & 3.25 & 307 \\
+ResNet-50 & 2.15 & 465 & 1.19 & 837 & 0.63 & 1594 \\
+ResNet-101 & 3.72 & 268 & 2.11 & 474 & 1.14 & 876 \\
+ResNet-200 & 6.06 & 165 & 3.42 & 292 & 1.96 & 509 \\
 \bottomrule
 \end{tabular*}
 \end{table}
