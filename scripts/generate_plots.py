@@ -190,7 +190,7 @@ def plot_alpha_ablation():
         "D": [0.416, 0.586, 0.573, 0.572, 0.576, 0.580, 0.579, 0.581],
     }
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(6, 3))
     for cfg_key, vals in config_data.items():
         cfg = configs[cfg_key]
         ax.plot(alphas, vals, marker=cfg["marker"], color=cfg["color"],
@@ -200,7 +200,7 @@ def plot_alpha_ablation():
     ax.set_ylabel("Rank-1 Identification Rate")
     ax.set_title(r"KD Loss Mixing ($\alpha$) Ablation", pad=40)
     ax.set_xticks(alphas)
-    ax.legend(fontsize=8, loc="center", bbox_to_anchor=(0.5, 1.07),
+    ax.legend(fontsize=8, loc="center", bbox_to_anchor=(0.5, 1.10),
               ncol=2, frameon=True, fancybox=False, edgecolor="0.8")
     ax.grid(alpha=0.3)
     ax.set_ylim(0.39, 0.63)
@@ -233,7 +233,7 @@ def plot_kd_overview():
     fig, ax = plt.subplots(figsize=(7, 4))
     x = np.arange(len(models))
     w = 0.25
-    ax.bar(x - w, phase1_best, w, label="Best Phase 1 (Baseline/LoRA)", color="#4c72b0", edgecolor="white")
+    ax.bar(x - w, phase1_best, w, label="Best of Baseline / LoRA", color="#4c72b0", edgecolor="white")
     ax.bar(x, kd_best, w, label=r"Best KD ($\alpha$=0.7)", color="#dd8452", edgecolor="white")
     ax.bar(x + w, kd_best_alpha, w, label=r"Best KD (optimal $\alpha$)", color="#55a868", edgecolor="white")
 
@@ -349,7 +349,7 @@ def plot_cmc_curves():
     ranks = list(range(1, 11))
     rank_keys = [f"tinyface/test/rank@{i}" for i in ranks]
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(6, 3))
     styles = {
         "DeiT3-B Baseline": {"color": "#ff7f0e", "ls": "-", "marker": "o"},
         "DeiT3-B LoRA": {"color": "#ff7f0e", "ls": "--", "marker": "s"},
@@ -374,7 +374,7 @@ def plot_cmc_curves():
     ax.set_ylabel("Identification Rate")
     ax.set_title("CMC Curves \u2014 Top Models on TinyFace", pad=45)
     ax.set_xticks(ranks)
-    ax.legend(fontsize=9, loc="center", bbox_to_anchor=(0.5, 1.08),
+    ax.legend(fontsize=9, loc="center", bbox_to_anchor=(0.5, 1.12),
               ncol=3, frameon=True, fancybox=False, edgecolor="0.8")
     ax.grid(alpha=0.3)
     fig.savefig(os.path.join(OUT_DIR, "cmc_curves.pdf"))

@@ -84,19 +84,19 @@ PARETO_LABEL_OFFSETS = {
     "resnet50d":       ( 8,   5, "left"),
     "resnet101d":      ( 8,   5, "left"),
     "resnet200d":      ( 8,   5, "left"),
-    "deit3_small":     (-7, -12, "right"),
-    "deit3_medium":    ( 8,   8, "left"),
+    "deit3_small":     (-30, 10, "left"),
+    "deit3_medium":    (-7,   9, "right"),
     "deit3_base":      ( 8,   5, "left"),
-    "swin_tiny":       (-7,   9, "right"),
-    "swin_small":      ( 8,   5, "left"),
-    "swin_base":       ( 8,   5, "left"),
-    "convnext_tiny":   ( 8, -12, "left"),
-    "convnext_small":  ( 8, -12, "left"),
-    "convnext_base":   ( 8, -12, "left"),
-    "pvt_v2_b2":       ( 8,   8, "left"),
-    "pvt_v2_b3":       ( 8,   8, "left"),
+    "swin_tiny":       (-2,   8, "right"),
+    "swin_small":      ( 0,  10, "center"),
+    "swin_base":       ( 0,  10, "center"),
+    "convnext_tiny":   ( 0, -15, "center"),
+    "convnext_small":  ( 0, -15, "center"),
+    "convnext_base":   ( 0, -15, "left"),
+    "pvt_v2_b2":       ( 8,   0, "left"),
+    "pvt_v2_b3":       ( -2,   8, "left"),
     "pvt_v2_b5":       (-7,   8, "right"),
-    "mobilevitv2_200": (-7, -12, "right"),
+    "mobilevitv2_200": ( 10, 10, "center"),
 }
 
 TIMM_TO_SHORT = {
@@ -205,7 +205,7 @@ def plot_pareto(df: pd.DataFrame, rank1: dict, out_pdf: Path) -> None:
     pts = [(m, float(fp16[m]), float(rank1[m]), FAMILY_OF[m])
            for m in ORDER if m in fp16.index and m in rank1]
 
-    fig, ax = plt.subplots(figsize=(8.5, 5.6))
+    fig, ax = plt.subplots(figsize=(8.5, 4))
     for m, lat, r1, fam in pts:
         ax.scatter(lat, r1, c=FAMILY_COLORS[fam], s=90, zorder=5,
                    edgecolors="white", linewidths=0.7)
@@ -239,7 +239,7 @@ def plot_pareto(df: pd.DataFrame, rank1: dict, out_pdf: Path) -> None:
                  "unified native TensorRT", fontsize=13)
     handles = [Patch(facecolor=c, label=f) for f, c in FAMILY_COLORS.items()]
     handles.append(Line2D([0], [0], linestyle="--", color="k", alpha=0.45,
-                          label="Pareto frontier"))
+                          label="Pareto front"))
     ax.legend(handles=handles, loc="lower right", fontsize=10.5, frameon=False)
     ax.grid(linestyle=":", alpha=0.5)
 

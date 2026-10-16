@@ -749,7 +749,7 @@ def plot_size_reduction_waterfall():
     # Sort by FP32 size descending
     models.sort(key=lambda m: m["fp32"], reverse=True)
 
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(8, 3))
     x = np.arange(len(models))
     w = 0.25
 

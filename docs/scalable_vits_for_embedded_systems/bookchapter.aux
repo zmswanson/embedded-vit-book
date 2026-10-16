@@ -1,0 +1,287 @@
+\relax 
+\bibstyle{splncs04}
+\citation{rodrigo2024transformersvsCNN}
+\citation{dosovitskiy2021vit}
+\citation{dosovitskiy2021vit}
+\citation{touvron2021deit,mehta2022mobilevit}
+\citation{li2022efficientformer}
+\citation{liu2025survey_vit_edge,ceva2023transformer_npu}
+\@writefile{toc}{\contentsline {title}{Scalable Vision Transformers}{1}{}\protected@file@percent }
+\@writefile{toc}{\authcount {2}}
+\@writefile{toc}{\contentsline {author}{Zachary Swanson \and Benjamin S. Riggan}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{}\protected@file@percent }
+\citation{cheng2018lowresface}
+\citation{dosovitskiy2021vit}
+\citation{dosovitskiy2021vit}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Anatomy of Vision Transformers}{2}{}\protected@file@percent }
+\newlabel{sec:anatomy}{{2}{2}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces High-level architecture of a Vision Transformer (ViT) from the original ViT paper from Dosovitskiy et al.~\cite  {dosovitskiy2021vit}. An input image is divided into fixed-size patches, embedded into tokens, and processed by a stack of transformer encoder blocks composed of multi-head self-attention and feed-forward layers.}}{2}{}\protected@file@percent }
+\newlabel{fig:vit_arch}{{1}{2}{}{}{}}
+\citation{vaswani2017attention}
+\citation{vaswani2017attention,zhang2021d2l}
+\citation{xiong2020preln}
+\citation{ba2016layernorm}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Self-Attention and Multi-Head Mechanism}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Transformer Encoder Structure}{3}{}\protected@file@percent }
+\citation{he2016resnet}
+\citation{vaswani2017attention}
+\citation{dorszewski2025concepts_vit}
+\citation{dosovitskiy2021vit}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Example of multi-head self attention on three tokens of length 12 ($d=12$) where each token is passed to three separate linear projection heads to project the tokens to a smaller dimension (4). Thus, each head ideally learns a different representation of the token indicated by the varying shades. Self-attention is performed in parallel for each subspace and the resulting token vectors are concatenated to produce tokens of the same dimensionality as the original.}}{4}{}\protected@file@percent }
+\newlabel{fig:multihead_attention}{{2}{4}{}{}{}}
+\citation{devlin2019bert}
+\citation{liu2021swin}
+\citation{vaswani2017attention}
+\citation{dosovitskiy2021vit}
+\citation{ranftl2021dpt,bolya2024window_attention}
+\citation{liu2021swin}
+\citation{touvron2021deit}
+\citation{touvron2021deit}
+\citation{liu2021swin}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Tokenization and Position Embeddings}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Architectural Survey of Efficient Vision Models}{5}{}\protected@file@percent }
+\newlabel{sec:arch-survey}{{2.4}{5}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Data-Efficient Image Transformer (DeiT, 2021):}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Swin Transformer (2021):}{5}{}\protected@file@percent }
+\citation{wang2021pvt}
+\citation{wang2021pvt}
+\citation{mehta2022mobilevit}
+\citation{mehta2022mobilevit}
+\citation{liu2022convnext}
+\citation{liu2022convnext}
+\citation{Zhao2025H4HNAS,LiPaolieriGolubchik2025,Quadric2023ViT}
+\citation{he2016resnet}
+\citation{he2016resnet}
+\citation{ignatov2021ai_benchmark,android2025optimization}
+\@writefile{toc}{\contentsline {paragraph}{Pyramid Vision Transformer (PVT, 2021):}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{MobileViT (2022):}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{ConvNeXt (2022):}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{ResNet (2016):}{6}{}\protected@file@percent }
+\citation{mlsys2023ondevice_chapter,ambient2025training_vs_inference}
+\citation{mlsys2023ondevice_chapter}
+\citation{zhu2024ondevice_training_survey,mlsys2023ondevice_chapter}
+\citation{nadalini2025odl_tiny,mlsys2023ondevice_chapter}
+\citation{mlsys2023ondevice_chapter}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Optimization Strategies for Embedded Training}{7}{}\protected@file@percent }
+\newlabel{sec:optim}{{3}{7}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Training Pipeline and Resource Constraints}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Offline Training vs.\ On-Device Adaptation}{7}{}\protected@file@percent }
+\citation{houlsby2019adapter,mlsys2023ondevice_chapter}
+\citation{hu2022lora}
+\citation{narayan2025petalface}
+\citation{Wang2025HyCLoRA}
+\citation{narayan2025petalface}
+\citation{narayan2025petalface,narayan2024facemoe}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Parameter-Efficient Tuning (LoRA)}{8}{}\protected@file@percent }
+\citation{touvron2021deit}
+\citation{zhang2022minivit,wu2022tinyvit}
+\citation{Roth2024ResourceEff}
+\citation{Li2023IViT}
+\citation{Shang2024PTQ}
+\citation{Ranjan2024MixQViT}
+\citation{IBM2023QAT}
+\citation{Lin2022FQViT}
+\citation{Jiang2023SingleShot}
+\citation{Roth2024ResourceEff}
+\citation{Park2023PTPrune}
+\citation{Roth2024ResourceEff}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Knowledge Distillation}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Quantization and Pruning}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Quantization:}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pruning:}{9}{}\protected@file@percent }
+\citation{Ngo2025EdgeInference}
+\citation{Roth2024ResourceEff}
+\citation{liu2025modelcompression,Jiang2023SingleShot}
+\citation{Li2023IViT}
+\citation{cheng2018lowresface}
+\citation{russakovsky2015imagenet}
+\citation{wightman2019timm}
+\citation{wightman2019timm}
+\citation{russakovsky2015imagenet}
+\citation{wightman2019timm}
+\@writefile{toc}{\contentsline {paragraph}{Embedded Deployment Considerations:}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Setup}{10}{}\protected@file@percent }
+\newlabel{sec:experimental}{{4}{10}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Dataset Selection: TinyFace}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Image Resolution and Preprocessing}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Model Architectures and Configurations}{10}{}\protected@file@percent }
+\citation{narayan2025petalface}
+\citation{hu2022lora}
+\citation{narayan2025petalface}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Architecture variants evaluated in this study with approximate parameter counts (millions) and total transformer/convolutional block counts. DeiT-3 Base/Small/Tiny correspond to DeiT3-B/M/S; PVT Base/Small/Tiny to PVT-v2-B5/B3/B2; ResNet Base/Small/Tiny to ResNet-200/101/50. MobileViT-v2-200 layer count reflects the 9 linear transformer blocks across 3 hybrid stages. All models use ImageNet-1k pretrained weights from the \texttt  {timm} library~\cite  {wightman2019timm}.}}{11}{}\protected@file@percent }
+\newlabel{tab:arch-specs}{{1}{11}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Training Protocol}{11}{}\protected@file@percent }
+\newlabel{sec:training-protocol}{{4.4}{11}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Baseline Training.}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{LoRA Fine-Tuning.}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Knowledge Distillation Setup}{11}{}\protected@file@percent }
+\newlabel{sec:kd-setup}{{4.5}{11}{}{}{}}
+\newlabel{eq:kd-loss}{{2}{11}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Evaluation Methodology}{12}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}ONNX Export and Quantization}{12}{}\protected@file@percent }
+\newlabel{sec:onnx-quant-setup}{{4.7}{12}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Structured Pruning}{12}{}\protected@file@percent }
+\newlabel{sec:pruning-setup}{{4.8}{12}{}{}{}}
+\citation{Park2023PTPrune}
+\@writefile{toc}{\contentsline {paragraph}{Attention Head Pruning.}{13}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Block Dropping.}{13}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Performance Analysis}{13}{}\protected@file@percent }
+\newlabel{sec:performance}{{5}{13}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Baseline Architecture Comparison}{13}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Rank-1 identification rate on the TinyFace test set for all 16 baseline model variants, sorted by performance. On this low-resolution dataset, vision transformers (DeiT-3, Swin) outperform CNNs (ResNet, ConvNeXt) and hybrid architectures.}}{14}{}\protected@file@percent }
+\newlabel{fig:baseline-comparison}{{3}{14}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Parameter-Efficient Fine-Tuning with LoRA}{14}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Knowledge Distillation Results}{14}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Model parameter count versus rank-1 identification rate. Student models (circles) range from 17.4M to 87.6M parameters, while teacher models (stars) used for knowledge distillation are substantially larger (CVLFace 114.9M, PETALface 213.8M). The teachers' size and input resolution requirements make them impractical for embedded deployment, motivating the distillation approach studied in Section~\ref {sec:kd-setup}.}}{15}{}\protected@file@percent }
+\newlabel{fig:params-vs-accuracy}{{4}{15}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Knowledge distillation results (rank-1) compared to standalone training. \emph  {Best B/L} refers to the better of baseline or LoRA for each model. The best KD result across all teacher configurations is shown. $\Delta $ indicates the change from the best non-KD result to the best KD result. Default $\alpha = 0.7$.}}{15}{}\protected@file@percent }
+\newlabel{tab:kd-results}{{2}{15}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Comparison of baseline (full fine-tuning) and LoRA fine-tuning across Swin and DeiT-3 model variants. LoRA improves Swin models but degrades DeiT-3 performance, revealing an architecture-dependent response to parameter-efficient adaptation.}}{16}{}\protected@file@percent }
+\newlabel{fig:baseline-vs-lora}{{5}{16}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Cumulative match characteristic (CMC) curves for the top-performing models compared to a ResNet-50 baseline. DeiT3-Base with LoRA achieves the highest identification rates across all ranks.}}{16}{}\protected@file@percent }
+\newlabel{fig:cmc-curves}{{6}{16}{}{}{}}
+\citation{hinton2015distillation}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Effect of the distillation loss mixing coefficient $\alpha $ on rank-1 identification rate across four student--teacher configurations. The default $\alpha = 0.7$ is suboptimal for all configurations; lower values favoring the KD loss produce the best results.}}{17}{}\protected@file@percent }
+\newlabel{fig:alpha-ablation}{{7}{17}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Optimal distillation mixing coefficient $\alpha $ for each configuration. In all cases, the commonly used $\alpha = 0.7$ is suboptimal. The rightmost column shows the improvement from tuning $\alpha $.}}{17}{}\protected@file@percent }
+\newlabel{tab:alpha-optimal}{{3}{17}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Distillation Loss Mixing Ablation}{17}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Knowledge distillation impact: comparison of best standalone training, best KD with default $\alpha = 0.7$, and best KD with optimally tuned $\alpha $. Alpha tuning produces substantial improvements for Swin-T and DeiT3-B.}}{18}{}\protected@file@percent }
+\newlabel{fig:kd-overview}{{8}{18}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Quantization Results}{18}{}\protected@file@percent }
+\newlabel{sec:quant-results}{{5.5}{18}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Post-training quantization results. FP16 conversion is effectively lossless across all models. INT8 dynamic quantization induces rank-1 drops of at most 0.0016 (absolute) and in one case produces a slight improvement ($+$0.0008 rank-1 for DeiT3-B KD).}}{19}{}\protected@file@percent }
+\newlabel{tab:quant-results}{{4}{19}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Model size reduction from FP32 through FP16 to INT8 quantization for all TRT-compatible baseline models. Compression ratios (annotated above INT8 bars) are consistent at $3.7$--$3.9\times $ across architectures.}}{19}{}\protected@file@percent }
+\newlabel{fig:size-reduction}{{9}{19}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Structured Pruning Results}{19}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Block dropping consistently outperforms head pruning.}{19}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Structured pruning + INT8 quantization results across four architectures. Rank-1 accuracy and compression ratio are relative to the corresponding unpruned FP32 model. Bold entries \emph  {improve} over the unpruned baseline. $^\dagger $Block dropping improves accuracy, suggesting depth over-parameterization. $^\ddagger $Head pruning on the KD ($\alpha {=}0.0$) checkpoint is catastrophically unstable (see text).}}{20}{}\protected@file@percent }
+\newlabel{tab:pruning-results}{{5}{20}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{DeiT3 is more robust to head pruning than Swin.}{20}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{KD-distilled Swin-T is catastrophically sensitive to head pruning.}{20}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Block dropping on Swin-B confirms depth redundancy.}{20}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{INT8 quantization remains stable on pruned models.}{20}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Comparison of pruning methods across all four architectures (FP32). Red dashed lines indicate the unpruned baseline accuracy. Block dropping (removing entire transformer blocks) consistently outperforms head pruning and in three architectures (Swin-T, Swin-B, DeiT3-S at 10\% heads) \emph  {improves} upon the unpruned model, confirming systematic depth over-parameterization on this 96$\times $96 task.}}{21}{}\protected@file@percent }
+\newlabel{fig:pruning-method}{{10}{21}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Compression--accuracy trade-off summary.}{21}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}On-Device Inference and TensorRT Compatibility}{21}{}\protected@file@percent }
+\newlabel{sec:trt-compat}{{5.7}{21}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Initial TRT Conversion Outcome.}{21}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Architecturally Incompatible Models.}{22}{}\protected@file@percent }
+\newlabel{sec:trt-compat-success}{{5.7}{22}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{A Practitioner's Guide to the Fix.}{22}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Opset upgrades and operator decomposition do not help.}{22}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Watch the dynamo exporter on TensorRT~10.x.}{22}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Half-measures at the model level are not enough.}{22}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Post-hoc ONNX graph surgery is fragile.}{22}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Unified native TensorRT inference latency on the Jetson Orin Nano (batch size 1, $96\times 96$ input, MAXN\_SUPER, locked clocks). All sixteen baseline architectures execute as native TRT engines after applying the per-family rewrites of Section~\ref {sec:trt-compat-success} where required. INT8 uses TRT's built-in PTQ calibration and is reported only for the nine originally TRT-compatible models.}}{23}{}\protected@file@percent }
+\newlabel{tab:jetson-latency-full}{{6}{23}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{The fix that does work is a per-family module-level rewrite.}{23}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Always verify cosine similarity end-to-end.}{23}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{ONNX Runtime's TensorRT EP is a viable but slower fallback.}{23}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Unified Latency Results.}{23}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Native TensorRT latency on the Jetson Orin Nano for all sixteen baseline models at FP32 (solid) and FP16 (light), batch size 1, $96\times 96$ input, MAXN\_SUPER. Bars are colored by architecture family.}}{24}{}\protected@file@percent }
+\newlabel{fig:latency-comparison}{{11}{24}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces TinyFace rank-1 accuracy vs.\ Jetson FP16 latency for all sixteen baselines under the unified native-TRT harness. The dashed line marks the Pareto front of non-dominated configurations.}}{24}{}\protected@file@percent }
+\newlabel{fig:pareto}{{12}{24}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Cross-Family Latency Comparison.}{24}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pareto Analysis.}{24}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Key Findings and Implications for Practitioners.}{25}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8}Per-Layer Bottleneck Analysis}{25}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Per-layer time breakdown (FP16, Jetson Orin Nano) for DeiT-3, Swin, and ResNet models. Absolute latency is annotated above each bar. Self-attention (red) consumes a larger fraction in Swin models ($27$--$31\%$) than in DeiT-3 ($7$--$12\%$), while FFN and linear layers (blue) dominate DeiT-3 models ($68$--$83\%$).}}{26}{}\protected@file@percent }
+\newlabel{fig:layer-breakdown}{{13}{26}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{DeiT-3 is FFN-dominated.}{26}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Swin distributes compute more evenly between attention and FFN.}{26}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{ResNet is conv-dominated.}{26}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Impact of pruning and KD on compute distribution.}{26}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.9}Computational Profile across Resolutions}{27}{}\protected@file@percent }
+\newlabel{sec:flops-profile}{{5.9}{27}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{DeiT-3 and Swin are FFN-bound at $96\times 96$.}{27}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{ConvNeXt is dominated by $1\times 1$ pointwise convolutions, not by depthwise.}{27}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Inference cost (GMACs, batch=1, FP32) versus input resolution for all 16 chapter architectures, grouped into per-family panels with a shared y-axis so that cost can be compared directly across families. Linear axes are used so that the super-linear ($\approx H^2$) growth is visible directly as a parabola; per-family panels prevent the four mid-size families from collapsing onto a single curve at the deployment resolutions. Counter: \texttt  {fvcore.nn.FlopCountAnalysis}.}}{28}{}\protected@file@percent }
+\newlabel{fig:flops-vs-resolution}{{14}{28}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{PVT v2 and MobileViT v2 are hybrid.}{28}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{ResNet is conv-bound, as expected.}{28}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {15}{\ignorespaces Per-module GMACs breakdown for the 16 chapter architectures at the $96\times 96$ TinyFace deployment resolution. Bars are normalised so that segments express the share of inference GMACs; absolute totals are annotated at the right edge. ConvNeXt's ``FFN/MLP'' segment is the inverted-bottleneck $1\times 1$ pointwise stack, which the timm implementation registers as \texttt  {nn.Linear}.}}{29}{}\protected@file@percent }
+\newlabel{fig:flops-breakdown-96}{{15}{29}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Top-3 per-module GMACs contributors at the $96\times 96$ TinyFace deployment resolution. ``GMACs'' is the total backbone cost at batch=1; percentages give each category's share of that total. ``FFN / MLP'' includes the inverted-bottleneck $1\times 1$ projection stack for ConvNeXt; ``Attn other'' for PVT v2 captures the spatial-reduction projections inside the attention block.}}{29}{}\protected@file@percent }
+\newlabel{tab:flops-top-modules-96}{{7}{29}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.10}Summary and Implications for Embedded Deployment}{30}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Overall best results across all experiments. For each architecture, the best pruning+quantization configuration is shown alongside the unpruned baseline. The highest absolute student accuracy is Swin-T + KD ($\alpha {=}0.0$) at 0.616 rank-1; the smallest competitive model is DeiT3-S at 10\% heads, INT8 (21.7\,MB).}}{30}{}\protected@file@percent }
+\newlabel{tab:overall-summary}{{8}{30}{}{}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.11}Power-Mode Trade-offs}{31}{}\protected@file@percent }
+\newlabel{sec:power-modes}{{5.11}{31}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Discussion.}{31}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Latency, throughput and 15W slowdown across the three Jetson Orin Nano power modes for the 14-model representative subset (batch=1, $96\times 96$). All engines benchmarked under the unified native TensorRT harness (\texttt  {trtexec --useCudaGraph}); ConvNeXt-T and PVTv2-B2 use the rewritten engines described in Section~\ref {sec:trt-compat-success}. \textit  {Slowdown} is the 15W mean latency divided by the \texttt  {MAXN\_SUPER} mean latency; \textit  {FPS CV} is the coefficient of variation of throughput across the three modes (lower = more power-mode-stable).}}{32}{}\protected@file@percent }
+\newlabel{tab:power-modes}{{9}{32}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {16}{\ignorespaces Mean inference latency (ms, batch=1, $96\times 96$) for the 14-model representative subset across the three Jetson Orin Nano power modes, all under the unified native TRT harness. The 15W mode adds a uniform $20$--$40\%$ latency penalty over \texttt  {MAXN\_SUPER}; 25W is within $2$--$6\%$ of \texttt  {MAXN\_SUPER} for every model, mirroring the modest $\sim $1\,W difference observed via \texttt  {tegrastats}.}}{32}{}\protected@file@percent }
+\newlabel{fig:power-mode-latency}{{16}{32}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Deployment recommendation per power budget.}{32}{}\protected@file@percent }
+\citation{Ngo2025EdgeInference}
+\citation{cheng2018lowresface}
+\citation{hu2022lora}
+\@writefile{lof}{\contentsline {figure}{\numberline {17}{\ignorespaces Throughput normalised by the \emph  {configured} \texttt  {nvpmodel} budget (15, 25 or 25\,W). On a per-watt basis, the 15W mode is competitive with or wins against \texttt  {MAXN\_SUPER} for every workload, despite delivering lower absolute FPS.}}{33}{}\protected@file@percent }
+\newlabel{fig:power-mode-throughput-per-watt}{{17}{33}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Recommended model configurations for common embedded deployment scenarios, based on the experimental results from this study. All latency figures are FP16 on the Jetson Orin Nano at batch size~1. INT8 sizes assume ONNX dynamic quantization.}}{33}{}\protected@file@percent }
+\newlabel{tab:deployment-guide}{{10}{33}{}{}{}}
+\@writefile{toc}{\contentsline {paragraph}{Deployment Decision Guide.}{33}{}\protected@file@percent }
+\citation{narayan2025petalface}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{34}{}\protected@file@percent }
+\citation{Park2023PTPrune}
+\citation{Ngo2025EdgeInference}
+\citation{liu2023efficientvit}
+\citation{vasu2023fastvit}
+\bibdata{references}
+\bibcite{ambient2025training_vs_inference}{1}
+\bibcite{ba2016layernorm}{2}
+\bibcite{bolya2024window_attention}{3}
+\bibcite{cheng2018lowresface}{4}
+\bibcite{devlin2019bert}{5}
+\bibcite{dorszewski2025concepts_vit}{6}
+\bibcite{dosovitskiy2021vit}{7}
+\bibcite{android2025optimization}{8}
+\bibcite{he2016resnet}{9}
+\bibcite{hinton2015distillation}{10}
+\bibcite{houlsby2019adapter}{11}
+\bibcite{hu2022lora}{12}
+\bibcite{IBM2023QAT}{13}
+\bibcite{ignatov2021ai_benchmark}{14}
+\bibcite{Jiang2023SingleShot}{15}
+\bibcite{ceva2023transformer_npu}{16}
+\bibcite{Park2023PTPrune}{17}
+\bibcite{li2022efficientformer}{18}
+\bibcite{Li2023IViT}{19}
+\bibcite{LiPaolieriGolubchik2025}{20}
+\bibcite{Lin2022FQViT}{21}
+\bibcite{liu2025modelcompression}{22}
+\bibcite{liu2023efficientvit}{23}
+\bibcite{liu2021swin}{24}
+\bibcite{liu2022convnext}{25}
+\bibcite{mehta2022mobilevit}{26}
+\bibcite{nadalini2025odl_tiny}{27}
+\bibcite{narayan2025petalface}{28}
+\bibcite{narayan2024facemoe}{29}
+\bibcite{Ngo2025EdgeInference}{30}
+\bibcite{Quadric2023ViT}{31}
+\bibcite{ranftl2021dpt}{32}
+\bibcite{Ranjan2024MixQViT}{33}
+\bibcite{rodrigo2024transformersvsCNN}{34}
+\bibcite{Roth2024ResourceEff}{35}
+\bibcite{russakovsky2015imagenet}{36}
+\bibcite{liu2025survey_vit_edge}{37}
+\bibcite{Shang2024PTQ}{38}
+\bibcite{touvron2021deit}{39}
+\bibcite{vasu2023fastvit}{40}
+\bibcite{vaswani2017attention}{41}
+\bibcite{wang2021pvt}{42}
+\bibcite{Wang2025HyCLoRA}{43}
+\bibcite{wightman2019timm}{44}
+\bibcite{wu2022tinyvit}{45}
+\bibcite{xiong2020preln}{46}
+\bibcite{zhang2021d2l}{47}
+\bibcite{zhang2022minivit}{48}
+\bibcite{mlsys2023ondevice_chapter}{49}
+\bibcite{Zhao2025H4HNAS}{50}
+\bibcite{zhu2024ondevice_training_survey}{51}
+\gdef \@abspage@last{37}
