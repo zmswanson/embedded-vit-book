@@ -1,0 +1,228 @@
+Response to the reviewer
+
+Thank you for the constructive comments. We have revised the manuscript as
+described below. The experimental descriptions were checked against the saved
+configurations and logs for the evaluated runs and the repository implementation.
+No models were retrained for this revision.
+
+1. LoRA and progressive backbone unfreezing (Sections 4.3 and 4.4)
+
+We agree that the original descriptions did not clearly distinguish two
+completed training phases. The preliminary hyperparameter sweeps used standard
+LoRA with the backbone frozen throughout training. The final runs plotted in the
+main test-set comparison used LoRA with progressive backbone unfreezing.
+Sections 4.3 and 4.4 now describe both procedures explicitly. The abstract,
+results, discussion, and conclusion distinguish the phases and avoid attributing
+the hybrid's outcomes to low-rank updates alone.
+
+The preliminary AdaFace sweeps used 40 epochs, batch size 8, QKV-only adapters,
+no gradual unfreezing, and no backbone-bias training. The selected Swin-Base and
+DeiT3-Base configurations achieved EVAL rank-1 rates of 0.5814 and 0.5891,
+respectively. These are hyperparameter-selection metrics, distinct from the
+test-set rates plotted for the later hybrid models; they are now reported with
+their split and procedure explicitly identified.
+
+Section 4.4 now gives the complete schedule, using zero-based epoch indices.
+During epochs 0-4, only the adapters and AdaFace classification head were
+trainable. Swin's final stage was unfrozen at epoch 5 and its preceding stage at
+epoch 10. DeiT-3's final eight of twelve blocks were unfrozen one at a time,
+deepest first, at epochs 5, 10, ..., 40. All original weights within each selected
+module became trainable, including its attention projections, FFN, and
+normalization weights. The remaining backbone components stayed frozen.
+
+A new trainability table reports the percentage of original backbone parameters
+trainable at successive stages. The final percentages were 95.65%, 97.55%, and
+97.55% for Swin-T/S/B, and 65.71%, 65.95%, and 66.18% for DeiT3-S/M/B. Adapters
+and the classification head are excluded from these percentages and remained
+trainable throughout. Counts were reconstructed from the implemented callbacks
+and saved run settings, rather than presented as newly measured training results.
+We also report the actual adapter ranks in the final hybrid runs: 24 for
+Swin-T/S, 8 for Swin-B, and 4 for DeiT-3. The text distinguishes the complete
+50-epoch schedule from the earlier checkpoint selected by EVAL rank-1 for test
+evaluation. For example, the selected DeiT3-Base hybrid checkpoint is from epoch
+8, when one block (8.27% of original backbone parameters) had been unfrozen.
+
+The general account of standard LoRA in Section 3.3 remains distinct from this
+experimental hybrid. Its discussion now makes clear that frozen-backbone
+optimizer-state and adapter-only update-payload savings cannot be assumed for
+our progressively unfrozen runs. Section 4.5 also clarifies that Direct KD used
+progressive unfreezing without adapters, whereas LoRA KD added adapters to that
+schedule. Auditing the comparison runs also corrected the baseline description:
+the paired baselines used 50 epochs, batch size 8, and progressive unfreezing
+without adapters, not 100-epoch full fine-tuning. The architecture-survey methods
+now reflect the saved per-family configurations, including batch size 16 and an
+ArcFace head for ResNet. These corrections change the training description, not
+the recorded accuracy results.
+
+2. Multi-head attention terminology (Section 2.1 and Figure 1)
+
+We now consistently call the encoder mechanism multi-head self-attention (MHSA).
+Section 2.1 explains that multi-head attention is the broader mechanism:
+self-attention derives queries, keys, and values from the same sequence, whereas
+cross-attention derives queries from a different sequence than keys and values.
+The caption of Figure 1 explicitly explains that the original source diagram's
+label "Multi-Head Attention" denotes MHSA in this encoder. Figure 2's caption
+uses the same spelling and abbreviation as the text.
+
+3. Definition and example of patch embeddings (Section 2.1)
+
+We added an explicit definition: a patch embedding is the fixed-length vector
+obtained by a shared learned linear projection of a flattened image patch. A
+small example divides an 8x8 RGB image into four 4x4 patches, orders them by rows,
+and projects each patch's 48 pixel values to a 12-dimensional token. We connect
+this example to the evaluated DeiT-3 inputs: a 96x96 image with 16x16 patches
+produces a 6x6 grid, or 36 patch tokens before adding the classification token.
+
+4. Swin's accuracy and computational efficiency (Section 2.4)
+
+We expanded the explanation of local-window MHSA, alternating regular and
+shifted partitions, and hierarchical patch merging. Shifted partitions allow
+information to cross window boundaries, while patch merging builds broader
+context at coarser spatial scales. The text distinguishes these mechanisms for
+preserving useful representations from a guarantee of unchanged task accuracy.
+It also states that the attention-interaction term changes from O(N^2 D) for
+global attention to O(N M^2 D) for fixed M-by-M windows.
+
+5. Space before the sparsity citation (Section 3.5)
+
+We inserted a nonbreaking space before the citation following "sparsity".
+
+6. Final TensorRT conversion outcome (Abstract and Section 5.7)
+
+The abstract now distinguishes out-of-the-box conversion failures from the final
+deployment result. It states that per-family module-level rewrites enabled
+native TensorRT inference for all 16 architectures. This agrees with the
+successful conversion procedure and unified native-TensorRT benchmarks already
+reported in Section 5.7.
+
+Additional consistency corrections
+
+We made the CMC discussion and caption explicit about the result already
+described in the submission: the DeiT3-Base baseline leads at every plotted
+rank. Its rank-1/rank-10 rates are
+0.583/0.741, versus 0.550/0.710 for the LoRA-with-unfreezing run. We also qualified
+the description of degraded Swin KD runs to acknowledge the successful
+Swin-Small LoRA/CVLFace fine-tuned result of 0.559, and corrected the dimensions
+of the adapter factors in the experimental LoRA equation. These changes align
+the narrative with existing results; they introduce no new accuracy or latency
+measurements.
+
+We also reconciled the compression and deployment claims with the saved CSVs.
+The four representative unpruned models have a maximum dynamic-INT8 rank-1 loss
+of 0.0016 (mean signed change -0.0008). Across the 24 pruned models, the mean
+and median absolute changes are 0.0017 and 0.0013, and the largest loss is
+0.0099. FP16 is described as near-lossless, with maximum absolute changes of
+0.0005 for the four unpruned examples and 0.0008 for the pruned models. The
+abstract, tables, discussion, and conclusion now distinguish those scopes.
+Quantization-table deltas use four decimal places to avoid concealing changes.
+
+The uniform sixteen-architecture FP16 speedup range is 1.53-2.02x, rather than
+1.7-2.1x. The ONNX Runtime TensorRT-EP/native-FP16 latency ratio is 1.18-2.66x;
+six of seven dynamic-INT8 CUDA-EP models slow down by 6.54-13.90x, with
+MobileViT-v2 as the exception. The warm-up was 500 milliseconds, not iterations.
+We removed a redundant parameter-count column from the uniform latency table
+that mixed stock-classifier and embedding-backbone counting conventions.
+
+The deployment guide now compares five native TensorRT configurations at
+batch 1, 96x96, MAXN_SUPER, with locked CPU/GPU clocks. All five rank-1
+scores were evaluated directly in TensorRT on the same 4,443 matching-gallery
+images and 3,728 probes. Swin-T KD correctly identifies 2,296 probes (0.6159),
+its two-block-pruned variant 2,173 (0.5829), ResNet-50d 1,775 (0.4761), pruned
+DeiT3-S FP16 2,102 (0.5638), and calibrated INT8 1,977 (0.5303). Thus the first
+three rows no longer substitute PyTorch/ONNX accuracy for native execution.
+Section 4.6 explicitly identifies the reduced-gallery protocol: distractors
+were excluded. The full TinyFace distractor benchmark has not been rerun.
+No models were retrained.
+
+GPU compute latency was refreshed in three repeats for every engine in the
+same session, using CUDA Graph and no transfers: 1.34, 1.17, 0.95, 1.02 and
+1.50 ms in table order. Swin and ResNet are faster than in the archived
+power-mode sweep, for a reason not isolated by these measurements. Table 11
+is labeled as a separate session and uses the complete new paired set;
+Table 10's historical sweep and cross-mode comparisons are preserved.
+Every engine size is directly measured and SHA-256 recorded: 55.9, 48.6,
+45.3, 42.6 and 22.5 MiB, rather than ONNX file sizes.
+
+Three fresh-process, sustained 45-second trials per engine also measure
+runtime resources. The existing Table 11 gains additional-RAM and module
+energy columns, preserving five compact single-line rows. Memory is the
+peak decrease in system MemAvailable relative to the preceding idle median;
+reported ranges span the three per-trial peaks. This measures additional
+system memory pressure, not an exact process footprint. CPU RSS and GPU
+allocations are recorded separately and never added on unified memory.
+The observed ranges are 194-208, 186-218, 179-211, 184-197 and 131-159 MiB.
+The discussion notes overlapping FP16 ranges rather than ranking small
+memory differences. Energy integrates VDD_IN total module input power over
+completed inferences, including baseline draw. Results are 23.3, 20.4, 17.2,
+17.0 and 18.7 mJ per inference. The INT8 engine lowers RAM demand and mean
+module power (16.6 to 12.5 W), but its longer execution raises energy per
+inference. Essential definitions are in Methods; raw traces, trial order,
+clock checks, allocations and provenance remain in supporting files.
+
+The calibrated INT8 counterpart uses 512 distinct training identities,
+one image each, seed 73, excluding validation/test identities. Inspector
+reports verify INT8 activations and weights with integer hardware tactics
+in all 48 learned linear projections; other layers retain floating point.
+Engine size drops 47%, but latency rises 46% and rank-1 drops 0.0335, so FP16
+remains the latency/accuracy choice for this model at batch size 1.
+
+The INT8 graph contains 51 reformat layers versus one in the unconstrained
+floating-point build. Separate layer profiles also show standalone softmax
+and attention operations where the floating-point graph uses fused code.
+The text presents conversion overhead and lost fusion as supported
+explanations, without claiming an isolated causal timing breakdown. Profiling
+adds overhead; the table retains the separate unprofiled latency results.
+The discussion now explicitly notes that larger batches may amortize layer
+overhead and improve Tensor Core utilization, citing NVIDIA's primary
+TensorRT batching guidance. Only batch size 1 was measured; a crossover in
+FP16/INT8 throughput remains unverified. Queueing delay and greater memory
+demand are identified as potential batching trade-offs.
+Calibration manifests/cache, inspector reports, predictions and timings are
+saved in inference_results/calibrated_native_deit3_small_heads10/; additional
+profiles are in inference_results/native_int8_profiles/. Engine sizes and
+hashes are in inference_results/deployment_engine_sizes.json. The complete
+five-engine native accuracy, refreshed timing, combined CSV/JSON and saved
+predictions are in inference_results/native_recommendations_validation/;
+raw memory/power traces and environment details are in the sibling
+native_recommendations_resources/ directory. Both numeric audits verify the
+measurements and the values printed in the deployment table.
+
+The deployment prose was edited to match the chapter's result-led discussion.
+Essential native calibration context is in the ONNX Export and Quantization
+methods subsection. Seeds, exact probe counts, build verification and raw
+runtime details remain in the supporting evidence. The results retain the
+measured FP16/INT8 trade-off, likely slowdown mechanisms and the untested
+batch-size hypothesis. Table 11 has five single-line data rows.
+
+The separate ONNX Runtime dynamic-INT8 measurement (0.5646 rank-1,
+21.7 MiB ONNX file, 13.43-ms transfer-inclusive CUDA/CPU latency) is retained
+in the evidence files. The chapter discusses dynamic quantization in its
+quantization and runtime sections; the deployment guide compares native
+TensorRT configurations.
+The power recommendations distinguish pooled input-rail measurements from
+per-model power guarantees; 25W retains 94-98% of MAXN_SUPER throughput.
+
+The pruning launch scripts also identify two misleading historical filenames:
+the earlier deit3_base_lora pruning files used the no-adapter baseline checkpoint,
+and the earlier swin_base pruning files used the hybrid LoRA checkpoint. The
+manuscript labels now follow those actual sources. The Swin-B block count is
+clarified as 24 total, with five removed from its eighteen-block third stage.
+The head-importance description now matches the implemented entrywise L1 score.
+We corrected the claim that block dropping universally outperformed head
+pruning: the tested DeiT3-S and DeiT3-B KD models favored modest head pruning.
+Raw experiment files and all recorded measurements are preserved.
+
+Figure 10 was regenerated from explicit source checkpoint IDs. Its Swin-B
+baseline panel previously selected the earlier hybrid's pruning values through
+an ambiguous derived variant label; it now shows the actual baseline pruning
+values used in the table and discussion. Both clean and highlighted copies
+were rebuilt and checked page by page, with resolved citations/references and
+no overfull boxes.
+
+The Methods prose was condensed to retain the training procedures, unfreezing
+schedule, trainable fractions and evaluation limits while leaving saved-run,
+callback-reconstruction and historical-filename details in supporting files.
+The pruning description identifies the actual training sources directly.
+Figure and table introductions were adjusted for proximity: all 25 floats
+follow their first references on the same or following page in both PDFs.
+The table contents and figure assets are unchanged by this editorial pass.

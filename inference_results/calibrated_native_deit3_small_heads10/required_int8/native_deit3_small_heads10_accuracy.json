@@ -1,0 +1,33 @@
+{
+  "measured_at_utc": "2026-10-22T18:54:54.902983+00:00",
+  "model": "deit3_small_baseline-heads_0.10",
+  "tensorrt_version": "10.3.0",
+  "protocol": "Gallery_Match + Probe only, matching the existing chapter; no distractors",
+  "gallery_images": 4443,
+  "probe_images": 3728,
+  "image_archive_sha256": "6c9eaf8802bec3a077859051d6c8b69e5fd50fac9b890898c1acb2bafbd68488",
+  "evaluation_script_sha256": "e7c77c586e2e281caf3f779099483ee3fe30c6b5ab77f7d4531d561dbac7b54d",
+  "preprocessing": "OpenCV-decoded RGB pixels; PIL bilinear resize to 96x96; ImageNet normalization",
+  "engines": {
+    "fp16": {
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+      "engine_sha256": "46110d5d1f9616065c13e70ba468ffc75166f65d50e81851cbd4d3ac3da2c7e7",
+      "rank1": 0.5638412017167382,
+      "correct_probes": 2102,
+      "probe_predictions_file": "fp16_predictions.json"
+    },
+    "calibrated_int8": {
+      "engine_path": "/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+      "engine_sha256": "c056048c9ddc0ced0c702376558f4c1d805417cf59f3f2d4b26158c9e70d2bc3",
+      "rank1": 0.5303111587982833,
+      "correct_probes": 1977,
+      "probe_predictions_file": "calibrated_int8_predictions.json"
+    }
+  },
+  "embedding_cosine_to_native_fp16": {
+    "calibrated_int8": {
+      "mean": 0.7551126480102539,
+      "minimum": 0.3552253544330597
+    }
+  }
+}

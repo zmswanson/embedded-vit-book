@@ -1,0 +1,230 @@
+[
+  {
+    "path": "eijkel2.eps",
+    "size": 13532,
+    "sha256": "ea0550c153a8d17c6f601b4768b0d35a1f02d99c2cb82c70b0a7cb8b3daa7feb",
+    "matches_original_repo": true
+  },
+  {
+    "path": "references.bib",
+    "size": 19075,
+    "sha256": "b4fb5e541f36cdf340f9eb1a3c612f0862f5b9bd1ff1698e155c1b22824b2a11",
+    "matches_original_repo": false
+  },
+  {
+    "path": "bookchapter.tex",
+    "size": 143837,
+    "sha256": "5c3c4317e917f389947720396c0cd1125e0ace0c301c2e57d245d993d68b1db5",
+    "matches_original_repo": false
+  },
+  {
+    "path": "llncs.cls",
+    "size": 41687,
+    "sha256": "5ac40671b3b421769f84f0e2020d9c9a3bc8c7f20833103e546b5cd81cac9355",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/kd_overview.png",
+    "size": 102853,
+    "sha256": "938da7431f6a79948f1fa2491c5ff2acf89858dbc8dfdabd869bc797b17f45bd",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/kd_overview.pdf",
+    "size": 19070,
+    "sha256": "4514ab7baffd8922eb009514f832003b512afa0da21627d4dd293b5bf7ca19ad",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/flops_breakdown_at_96.pdf",
+    "size": 23619,
+    "sha256": "d4e5e880113e6c008a86670339c232d1dc6c55e30795c16d725697c74e6d37a0",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/params_vs_accuracy.pdf",
+    "size": 26740,
+    "sha256": "573bcb93bd35ba65806065f0eba78d9c597675185364349913ff074e8c32f349",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/params_vs_accuracy.png",
+    "size": 145235,
+    "sha256": "8ef4871e0f2085d24ee90be49a8e6d6f4096095d7c91c27333ea1ea31de69514",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/latency_comparison_unified.pdf",
+    "size": 24357,
+    "sha256": "28d327a0d0ea0ee62e3e63129d4036ff1aca12b337b83b280a0d3b4b7f8797f0",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/size_reduction_waterfall.pdf",
+    "size": 15400,
+    "sha256": "c1b115c27992283e0fda7f9f0040a41ccfa701e3c60c7acb72ec6c2bb946c523",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/power_mode_throughput_per_watt.pdf",
+    "size": 19992,
+    "sha256": "7743ff7a3dc68e209715fa0e8f4997967054f2f85c834271a7e0d185ca01b6da",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/size_reduction_waterfall.png",
+    "size": 116788,
+    "sha256": "cf692b87f2cb49a8e8087ec43373414541d9d842fd21b463d93447ed26530bb5",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/cmc_curves.png",
+    "size": 166590,
+    "sha256": "2309a176d045b341bd6d2a0706a745e1ab2e5858c0bdb217d73305aaba111982",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/baseline_comparison.pdf",
+    "size": 19169,
+    "sha256": "c5bcfbc45ae45b32c5a1f0443a0686315c49dea2c59834a13c71cf5e16c97685",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/alpha_ablation.pdf",
+    "size": 22337,
+    "sha256": "2c924f805df39379d47ab06f3cc15f49b675d32940b75b76bfb8de792bbeec97",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/alpha_ablation.png",
+    "size": 148793,
+    "sha256": "f81c52dfaa8f4c28fa1dcf4cfc5f0bb73e65d8912178be8ea773ef1242b2d17c",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/flops_top_modules_table.tex",
+    "size": 1388,
+    "sha256": "bab5c359202d6d621f73f0ebff8156da7826f6afe2d6badcd7dae8b85e899ff5",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/baseline_comparison.png",
+    "size": 215270,
+    "sha256": "506c1d17b1dddd41cccf457021f2bfdde153178660895729ed157e177664d4fb",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/cmc_curves.pdf",
+    "size": 18914,
+    "sha256": "2dbb55b73a976ff6e830296b62bd196a1dac57dd672d13876b10a605576df969",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/int8_impact_pruned.png",
+    "size": 116200,
+    "sha256": "44693fbaa0d2105e280110aa7e39d8aa78d32d5ac9dee5c2643f0c5e91465308",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/multihead_attention.png",
+    "size": 119395,
+    "sha256": "6262feba07c58682524d47653ed37181a41107182e9488318aa3d2591f527a96",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/int8_impact_pruned.pdf",
+    "size": 22827,
+    "sha256": "30e0495cd792fb48db004c00c20e6b1ce34bc9cfe4a9d432f4537aee3de63990",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/accuracy_vs_latency_pareto_unified.pdf",
+    "size": 21332,
+    "sha256": "a5360695d340550d56ad24728c74fb2aaa964c8647e65749a816add2991915e7",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/power_mode_latency.pdf",
+    "size": 19384,
+    "sha256": "7b6406abaf310861fc4afcb8a22624524c3064c1b6b48f8713d357274b0698ab",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/vit_arch.png",
+    "size": 189857,
+    "sha256": "c1122d7fab3e6ed759a2637ba6a245d8098d5a9bbab7ed3f53c4f33bf9ef0e69",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/baseline_vs_lora.pdf",
+    "size": 15928,
+    "sha256": "1fd1b0a17879f3886f15baf27c950fa341f6dd0ab9757701ee18b34e30437035",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/pruning_method_comparison.pdf",
+    "size": 26129,
+    "sha256": "ab840cc3e69f3363752f1715de1e13ad78db65c648aac3a5a955ae5763a601e2",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/layer_breakdown.png",
+    "size": 151871,
+    "sha256": "2bf4a1900a2497c8363ce5a993ec20f38d12a23e4a1adbf8d3c940684f845d46",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/layer_breakdown.pdf",
+    "size": 20185,
+    "sha256": "50e80a85abbf219f7fbe879ccbdc556b075718e583d3bfa827bd76b06bf0e8e5",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/baseline_vs_lora.png",
+    "size": 104494,
+    "sha256": "dfd66603cb1325f6453d4b8bad5da0efee9ea130c146e887853bc90b100fa84e",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/pruning_method_comparison.png",
+    "size": 187924,
+    "sha256": "9b93f33ff5e6d78fad008b4de7ebf0204e803ddde24a44fee725b36d4ca4b08f",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/accuracy_vs_latency_pareto.pdf",
+    "size": 22284,
+    "sha256": "371a85db8243c50ce8b48e6142410199b10a3eacfeeb526d73196f462c6a24f8",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/latency_comparison.png",
+    "size": 190640,
+    "sha256": "cee6dca4c0230974e81df1b852aeb78c0b6948d2b3943fa71ff6fc2744daeacd",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/flops_vs_resolution.pdf",
+    "size": 30699,
+    "sha256": "f88d9a5415beee03161f988f79dcb3b6d1b941f4116e6e6a74f24549a7d6d26f",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/latency_comparison.pdf",
+    "size": 20124,
+    "sha256": "59b0aefb68d2c79ee42185775ac94b7f626e797bed7e61b9911895ee64664678",
+    "matches_original_repo": false
+  },
+  {
+    "path": "figures/accuracy_vs_latency_pareto.png",
+    "size": 199457,
+    "sha256": "93f274cfae11ea8dfbb64f36bc3d0a1e5e7cb277ae0901acf3c891018250c09a",
+    "matches_original_repo": true
+  },
+  {
+    "path": "figures/jetson_unified_table.tex",
+    "size": 1478,
+    "sha256": "175bf4babb4b5e8ad9ebc01447a52a71abb55fc5ce7f6002aa000dce4a4f026f",
+    "matches_original_repo": true
+  }
+]

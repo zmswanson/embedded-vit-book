@@ -24,7 +24,6 @@
 
 
 \usepackage{graphicx}
-\usepackage{gensymb}
 \graphicspath{ {figures/} }
 
 
@@ -40,14 +39,15 @@
 % give LaTeX more flexibility (top + bottom + here) so floats land near
 % their first reference without leaving large white spaces behind.
 \usepackage[section]{placeins}
+% Keep floats after the text that introduces them while allowing page breaks.
+\usepackage{flafter}
 % More permissive float fractions reduce orphan whitespace.
 \renewcommand{\topfraction}{0.92}
 \renewcommand{\bottomfraction}{0.85}
 \renewcommand{\textfraction}{0.08}
-% A high floatpagefraction discourages "float-only" pages, so floats
-% intermix with body text rather than gathering on a dedicated page
-% with vfill gaps between them.
-\renewcommand{\floatpagefraction}{0.9}
+% Require a substantially filled float page, while allowing paired plots
+% to share one page instead of being deferred separately.
+\renewcommand{\floatpagefraction}{0.85}
 \setcounter{topnumber}{3}
 \setcounter{bottomnumber}{2}
 \setcounter{totalnumber}{5}
@@ -96,7 +96,7 @@ Lincoln, NE 68588-0511\\
 \maketitle
 
 \begin{abstract}
-Deploying face recognition on embedded systems demands models that balance biometric accuracy against strict constraints on latency, memory, and power. This chapter presents a systematic evaluation of vision transformer (ViT) architectures for low-resolution face identification, covering the full pipeline from architecture selection through compression to on-device inference. Starting from 16 model variants across six families---DeiT-3, Swin Transformer, PVT-v2, MobileViT-v2, ConvNeXt, and ResNet---we evaluate parameter-efficient fine-tuning via LoRA, feature-level knowledge distillation with two teacher configurations, structured pruning (head removal and block dropping), and post-training quantization (FP16, INT8) on the TinyFace benchmark. Over 100 resulting configurations are benchmarked on an NVIDIA Jetson Orin Nano using TensorRT. Key findings include: (1) compact transformers outperform larger CNNs on low-resolution inputs---Swin-Tiny (27.5M parameters) with optimally tuned knowledge distillation ($\alpha{=}0.0$) achieves 0.616 rank-1 identification rate, exceeding ResNet-200 (62.6M) by $+$0.148; (2) INT8 quantization reduces model size by $3.8$--$3.9\times$ with at most 0.002 absolute rank-1 loss; (3) block dropping improves Swin accuracy by up to $+$0.028 rank-1, confirming depth over-parameterization; and (4) TensorRT compatibility is architecture-dependent, with ConvNeXt, PVT-v2, and MobileViT-v2 failing native conversion due to unsupported normalization patterns. We provide a deployment decision guide mapping model configurations to four common embedded scenarios, from maximum accuracy (DeiT3-B KD, 0.591 rank-1 at 2.6\,ms) to minimum memory (DeiT3-S pruned, 0.565 rank-1 at 21.7\,MB).
+Deploying face recognition on embedded systems demands models that balance biometric accuracy against strict constraints on latency, memory, and power. This chapter presents a systematic evaluation of vision transformer (ViT) architectures for low-resolution face identification, covering the full pipeline from architecture selection through compression to on-device inference. Starting from 16 model variants across six families---DeiT-3, Swin Transformer, PVT-v2, MobileViT-v2, ConvNeXt, and ResNet---we evaluate standard LoRA in preliminary sweeps, LoRA with progressive backbone unfreezing in final comparisons, feature-level knowledge distillation with two teacher configurations, structured pruning (head removal and block dropping), and post-training quantization (FP16, INT8) on the TinyFace benchmark. Over 100 resulting configurations are benchmarked on an NVIDIA Jetson Orin Nano using TensorRT. Key findings include: (1) compact transformers outperform larger CNNs on low-resolution inputs---Swin-Tiny (27.5M parameters) with optimally tuned knowledge distillation ($\alpha{=}0.0$) achieves 0.616 rank-1 identification rate, exceeding ResNet-200 (62.6M) by $+$0.148; (2) dynamic INT8 reduces the four representative unpruned model files by $3.8$--$3.9\times$ with at most 0.0016 absolute rank-1 loss, while the largest additional loss across 24 pruned models is 0.0099; (3) block dropping improves Swin accuracy by up to $+$0.028 rank-1, confirming depth over-parameterization; and (4) out-of-the-box TensorRT conversion fails for ConvNeXt, PVT-v2, and MobileViT-v2 due to unsupported normalization and attention export patterns, but per-family module-level rewrites enable native TensorRT inference for all 16 architectures. A deployment decision guide summarizes the resulting trade-offs between recognition accuracy, native inference latency, memory, energy and engine size.
 \keywords{Vision Transformers, Face Recognition, Edge AI, Model Compression, Knowledge Distillation, TensorRT}
 \end{abstract}
 
@@ -111,35 +111,39 @@ designed transformer models can now achieve competitive accuracy and runtime on 
 This chapter explores the development of ViTs for embedded systems in detail. Section~\ref{sec:anatomy} provides an overview of the ViT architecture including explanations of the core components and descriptions of ViT variants and other models explored in this work. Section~\ref{sec:optim} highlights optimization strategies commonly employed for training transformers including low-rank adaptation (LoRA) and knowledge distillation. Section~\ref{sec:experimental} provides an experimental setup that analyzes performance of the various ViT and CNN models through the lens of a challenging biometrics dataset, TinyFace. The TinyFace dataset features small facial crops, averaging $30 \times 30$ pixels, with facial imagery distorted by poor resolution and compression artifacts, motion blur, diverse illumination, and off-axis poses \cite{cheng2018lowresface}. This dataset was selected because it simulates the type of data that a real-world embedded system may process as part of a surveillance and facial recognition system. Finally, Section~\ref{sec:performance} presents and analyzes the biometric and computational performance metrics produced by the various models and optimization techniques on the TinyFace dataset. These results provide the reader with valuable data and insights for selecting the correct architecture for their application.
 
 \section{Anatomy of Vision Transformers}\label{sec:anatomy}
-The ViT architecture in Figure~\ref{fig:vit_arch} depicts two core components – patch and token generation and the transformer encoder. Both are examined in detail in the following subsections with additional exploration of the multi-head attention mechanism within the transformer encoder.
+The ViT architecture in Figure~\ref{fig:vit_arch} depicts two core components – patch and token generation and the transformer encoder. Both are examined in detail in the following subsections with additional exploration of the multi-head self-attention (MHSA) mechanism within the transformer encoder.
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=1.0\linewidth]{figures/vit_arch.png}
-    \caption{High-level architecture of a Vision Transformer (ViT) from the original ViT paper from Dosovitskiy et al.~\cite{dosovitskiy2021vit}. An input image is divided into fixed-size patches, embedded into tokens, and processed by a stack of transformer encoder blocks composed of multi-head self-attention and feed-forward layers.}
+    \caption{High-level architecture of a Vision Transformer (ViT) from the original ViT paper from Dosovitskiy et al.~\cite{dosovitskiy2021vit}. An input image is divided into fixed-size patches, embedded into tokens, and processed by a stack of transformer encoder blocks composed of multi-head self-attention (MHSA) and feed-forward layers. The source diagram's label ``Multi-Head Attention'' denotes MHSA: queries, keys, and values are derived from the same token sequence.}
     \label{fig:vit_arch}
 \end{figure}
 
 At a high level, the ViT takes a $P \times P$ image and breaks it into $Q \times Q$ patches such that $\left(P/Q\right)^2$ patches are generated, e.g., a $224 \times 224$ image split into $16 \times 16$ patches generates $\left(224/16\right)^2=14^2=196$ patches. These patches are converted into token vectors and fed to the transformer encoder. The encoder performs self-attention between all patches to weight the vectors based on global ``importance" and then performs a non-linear transformation via multilayer perceptron (MLP), also referred to as feed forward network (FFN), to generate a new token representation that is fed to the next encoder layer. The encoder process is repeated through multiple encoder layers effectively refining the token representation before delivering the image representation to a task-specific head. This explanation skips over many crucial details that will be presented in the following sections but provides a clear picture of how images flow through the transformer model.
 
 \subsection{Self-Attention and Multi-Head Mechanism}
-The fundamental component of a transformer is the self-attention layer. In a vision transformer, an image is first split into a sequence of patch embeddings, and a self-attention module then computes interactions between every pair of these patch tokens. Specifically, each token $i$ is projected to a query vector $q_i$, key vector $k_i$, and value vector $v_i$ in some latent dimension. The attention operation compares queries and keys via scaled dot-products: $s_{ij} = q_i \cdot k_j / \sqrt{d}$, where $d$ is the token dimension and is applied to appropriately scale the attention scores. A softmax is then applied to $\{s_{ij}\}$ across all tokens $j$ to obtain attention weights $\alpha_{ij}$, which indicate how much token $i$ attends to token $j$. These weights are used to compute a weighted sum of the value vectors $v_j$ for token $i$, updating its representation. Thus, the full attention operation may be represented as
+The fundamental component of a transformer is the self-attention layer. Before attention is applied, an image is divided into patches and each patch is converted into a \emph{patch embedding}: a learned, fixed-length vector representation of that patch. For an RGB image, flattening a $Q\times Q$ patch produces a vector $\mathbf{p}_i$ of $3Q^2$ pixel values; a shared learned linear projection maps it to $\mathbf{e}_i=\mathbf{E}\mathbf{p}_i+\mathbf{b}\in\mathbb{R}^{D}$, where $\mathbf{E}\in\mathbb{R}^{D\times3Q^2}$~\cite{dosovitskiy2021vit}.
+
+For a small example, an $8\times8$ RGB image divided into $4\times4$ patches produces a $2\times2$ grid: top-left, top-right, bottom-left, and bottom-right. Each patch contains $4\cdot4\cdot3=48$ values. Projecting each to, for example, $D=12$ dimensions and listing them row by row yields a sequence $(\mathbf{e}_1,\mathbf{e}_2,\mathbf{e}_3,\mathbf{e}_4)$ of four 12-dimensional tokens. Positional embeddings identify their original grid locations (Section~2.3). In the DeiT-3 experiments here, $96\times96$ RGB inputs with $16\times16$ patches similarly yield a $6\times6$ grid, or 36 patch tokens, before adding the classification token.
+
+Self-attention then computes interactions between every pair of these tokens. Specifically, each token $i$ is projected to a query vector $q_i$, key vector $k_i$, and value vector $v_i$ in some latent dimension. The attention operation compares queries and keys via scaled dot-products: $s_{ij} = q_i \cdot k_j / \sqrt{d_k}$, where $d_k$ is the query/key dimension and scales the attention scores. A softmax is then applied to $\{s_{ij}\}$ across all tokens $j$ to obtain attention weights $\alpha_{ij}$, which indicate how much token $i$ attends to token $j$. These weights are used to compute a weighted sum of the value vectors $v_j$ for token $i$, updating its representation. Thus, the full attention operation may be represented as
 \begin{equation}
     \text{Attention}(Q,K,V)=\text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 \end{equation}
 where $Q$, $K$, and $V$ are matrices containing the $q$, $k$, and $v$ vectors for all tokens, respectively. This allows information from one token to directly influence another, regardless of spatial distance, enabling the global receptive field of ViTs~\cite{vaswani2017attention}.
 
-Rather than use a single attention head, some transformers employ multi-head self-attention (MHSA). In MHSA, the token embeddings are projected into multiple subspaces via multiple linear layers (heads), and independent self-attention operations are performed in each subspace in parallel. After performing the parallel attentions, the lower-dimensional tokens are concatenated to produce a token of the same dimension as the original input token. Figure~\ref{fig:multihead_attention} provides an example where three heads are applied to three tokens of length 12, i.e., $d=12$.
+Rather than use a single attention head, transformers commonly employ multi-head self-attention (MHSA). Multi-head attention is the broader mechanism: in self-attention, queries, keys, and values come from the same sequence; in cross-attention, queries come from a different sequence than keys and values. The encoder attention described here is self-attention, and we use MHSA consistently for it. In MHSA, the token embeddings are projected into multiple subspaces via multiple linear layers (heads), and independent self-attention operations are performed in each subspace in parallel. After performing the parallel attentions, the lower-dimensional tokens are concatenated to produce a token of the same dimension as the original input token. Figure~\ref{fig:multihead_attention} provides an example where three heads are applied to three tokens of length 12, i.e., $d=12$.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=1.0\linewidth]{multihead_attention.png}
-    \caption{Example of multi-head self attention on three tokens of length 12 ($d=12$) where each token is passed to three separate linear projection heads to project the tokens to a smaller dimension (4). Thus, each head ideally learns a different representation of the token indicated by the varying shades. Self-attention is performed in parallel for each subspace and the resulting token vectors are concatenated to produce tokens of the same dimensionality as the original.}
+    \caption{Example of multi-head self-attention (MHSA) on three tokens of length 12 ($d=12$) where each token is passed to three separate linear projection heads to project the tokens to a smaller dimension (4). Thus, each head ideally learns a different representation of the token indicated by the varying shades. Self-attention is performed in parallel for each subspace and the resulting token vectors are concatenated to produce tokens of the same dimensionality as the original.}
     \label{fig:multihead_attention}
 \end{figure}
 
 In the example of Figure~\ref{fig:multihead_attention}, three heads are used and each head processes all three tokens of length 12 ($d=12$). Thus, the projected dimension is equal to the original token dimension ($d$) divided by the number of heads ($N_H$) such that $\frac{d}{N_H}=4$, as depicted by the smaller tokens to the right of the heads. The smaller tokens have varying shades of color to indicate that each head learns a different representation of the original token. Then, self-attention is performed independently within each subspace, i.e., there are three self-attention operations performed in this example. The output of the independent attention operations are concatenated to produce tokens with the same dimensionality as the original input token.
 
-This design has two benefits: (1) it allows parallel computation of attention, improving throughput on hardware accelerators by performing many smaller matrix multiplies simultaneously; and (2) each head can learn attention in a different representation subspace, so the model can attend to different kinds of features or relationships in parallel~\cite{vaswani2017attention,zhang2021d2l}. In essence, multi-head attention enables more nuanced and diversified learning, as tokens are compared on distinct portions of their feature descriptors across heads. The outputs of all heads are concatenated and passed through a linear projection to form the final attended representation for each token.
+This design has two benefits: (1) it allows parallel computation of attention, improving throughput on hardware accelerators by performing many smaller matrix multiplies simultaneously; and (2) each head can learn attention in a different representation subspace, so the model can attend to different kinds of features or relationships in parallel~\cite{vaswani2017attention,zhang2021d2l}. In essence, MHSA enables more nuanced and diversified learning, as tokens are compared on distinct portions of their feature descriptors across heads. The outputs of all heads are concatenated and passed through a linear projection to form the final attended representation for each token.
 
 \subsection{Transformer Encoder Structure}
 A vision transformer is constructed by stacking multiple \emph{encoder blocks}, each composed of a multi-head self-attention (MHSA) sub-layer followed by a position-wise feed-forward network (FFN), as shown in Figure~\ref{fig:vit_arch}. Modern ViT architectures typically adopt a \emph{pre-layer normalization (Pre-LN)} design to improve optimization stability, especially for deep models~\cite{xiong2020preln}. In this formulation, layer normalization is applied before both the attention and FFN sub-layers, and each sub-layer output is added to its input via a residual skip connection.
@@ -179,7 +183,9 @@ The basic ViT described above is often called a “columnar” or non-hierarchic
 
 \paragraph{Data-Efficient Image Transformer (DeiT, 2021):} The DeiT model by Touvron et al.~\cite{touvron2021deit} was a crucial step in making transformers practical without massive external data. Architecturally, DeiT is essentially the same as the original ViT (a “base” 12-layer transformer with 86 million parameters) but its innovation lies in the training method. DeiT introduced a knowledge distillation strategy tailored for transformers: a learnable distillation token is appended alongside the class token, and the transformer is trained to predict a teacher CNN’s class logits via this token. By using a pre-trained ResNet as teacher and extensive data augmentation and regularization, DeiT achieved 83.1\% top-1 accuracy on ImageNet using only ImageNet-1k data (no extra pre-training)~\cite{touvron2021deit}. This matches the performance of much larger ViTs that were pre-trained on hundred-million image corpora. The ability to train on a standard dataset with a single GPU machine (in under 3 days) greatly broadened the accessibility of ViTs.
 
-\paragraph{Swin Transformer (2021):} Swin Transformer by Liu et al.~\cite{liu2021swin} is a hierarchical ViT designed as a versatile vision backbone for both image classification and dense tasks. Swin introduced shifted local windows for self-attention. Instead of global attention over all patches, each Swin layer restricts attention to non-overlapping windows (e.g. $7\times7$ patch windows) which drastically reduces computation. To enable cross-window information flow, every other layer the window partitioning is shifted by a certain offset (hence “shifted” windows), so a patch will attend with neighbors that were in different windows in the previous layer. This scheme achieves linear computational complexity in image size (since window size is fixed) while still allowing distant patches to interact after a few layers. Along with this locality, Swin builds a multi-stage pyramid: patch merging layers between stages reduce the number of tokens (by $2\times$ in each spatial dimension) and increase the feature dimensionality, akin to a CNN downsampling. The result is a transformer that behaves much like a CNN feature hierarchy. The Swin Transformer has two advantages: (1) reduced memory footprint and computational cost by limiting attention to local windows, and (2) compatibility with dense prediction tasks, such as object detection, enabled by the hierarchical image representation, with applications spanning embedded vision systems to surveillance cameras.
+\paragraph{Swin Transformer (2021):} Swin Transformer by Liu et al.~\cite{liu2021swin} is a hierarchical ViT for classification and dense prediction. It restricts MHSA to non-overlapping local windows, typically $7\times7$ tokens. For $N$ tokens of width $D$, global attention has an attention-interaction cost of $\mathcal{O}(N^2D)$, whereas windows of $M\times M$ tokens reduce this term to $\mathcal{O}(NM^2D)$: linear in token count for fixed window size.
+
+Two design choices preserve useful context despite this restriction. First, consecutive blocks alternate regular and shifted window partitions, connecting tokens that previously belonged to separate windows. Repeated blocks therefore expand the receptive field without computing every token pair in each layer. Second, patch merging combines each $2\times2$ neighborhood into one wider token between stages, reducing token count fourfold while retaining a learned representation of the neighborhood. Early stages capture local detail, and later stages aggregate coarser, broader context. These cross-window connections and representations at multiple scales support recognition accuracy while reducing attention cost; they do not guarantee identical accuracy to global attention for every task~\cite{liu2021swin}.
 
 \paragraph{Pyramid Vision Transformer (PVT, 2021):} PVT by Wang et al.~\cite{wang2021pvt} was another early effort to adapt transformers as a general-purpose backbone. PVT introduces a pyramid of transformer stages to handle high-resolution inputs efficiently. In PVT, the image is initially patched into a large number of tokens (e.g. $4\times4$ patches) for the first stage, but then at each subsequent stage the tokens are merged (concatenating and projecting patches, similar to pooling) to progressively halve the resolution. This yields a pyramid of feature maps at multiple scales, much like a CNN. By the final stage, the token count is greatly reduced, addressing ViT’s high memory use on large feature maps. Notably, PVT uses full global attention within each stage (no windowing), but because later stages have few tokens, the overall cost remains manageable. The designers also modified the attention to include a spatial reduction on the attention keys/values for further speedup in high-resolution stages. PVT retains the benefit of both worlds: it has the global receptive field of transformers and the pyramidal structure of CNNs~\cite{wang2021pvt}.
 
@@ -221,7 +227,7 @@ This formulation significantly reduces the number of trainable parameters and as
 
 For embedded and resource-constrained settings, the advantages of LoRA are particularly compelling. Fine-tuning can be performed with smaller batch sizes, reduced memory consumption, and faster convergence, making it feasible to adapt large pretrained models using modest hardware. However, it should be noted that LoRA does not reduce the memory footprint training because all hidden states are required to train the new low-rank matrices~\cite{Wang2025HyCLoRA}. Because the backbone weights remain unchanged, LoRA preserves the model’s original representational capabilities while learning task-specific corrections. In low-resolution face recognition scenarios, for example, LoRA enables a transformer pretrained on high-quality facial imagery to adapt to datasets such as TinyFace without degrading its performance on higher-resolution domains~\cite{narayan2025petalface}. Recent works such as PETALface and FaceMoE~\cite{narayan2025petalface,narayan2024facemoe} further demonstrate that conditioning or gating LoRA updates can improve robustness across varying image qualities, though the underlying low-rank adaptation principle remains broadly applicable.
 
-From a deployed embedded systems perspective, LoRA also dramatically reduces the size of the payload required to update model weights over the network. Because the frozen backbone is identical across all devices, only the low-rank factors $A$ and $B$ need to be transmitted when distributing a new adaptation. For a Swin-Tiny backbone (27.5\,M FP32 parameters $\approx$ 110\,MB), a rank-$r{=}8$ LoRA update applied to the attention projections contains well under 1\% of the full parameter count---typically on the order of $\sim$100\,KB---a $1000\times$ reduction in over-the-air transfer size relative to shipping a full fine-tuned checkpoint. This makes LoRA particularly attractive for fleets of bandwidth-constrained or intermittently-connected edge devices, where periodic model refreshes (e.g., personalization to a new user, adaptation to a new sensor batch, or domain calibration) can be delivered as small ``patch'' files that the device merges into the resident backbone at load time without ever downloading a fresh full-precision model.
+From a deployed embedded systems perspective, frozen-backbone LoRA can also reduce the payload required to distribute model updates. Devices that share the same unchanged backbone need only receive the adapter factors, whose size depends on their rank and the targeted projections. These optimizer-state and update-payload savings apply to standard LoRA with a frozen backbone. The preliminary sweeps in Section~\ref{sec:training-protocol} used this frozen-backbone procedure, whereas the final test-set comparisons used LoRA with progressive backbone unfreezing. In the latter procedure the unfrozen pretrained weights also change, so their updates must be distributed along with the adapters. The final hybrid results therefore do not establish the training-memory or adapter-only transmission savings of standard LoRA.
 
 \subsection{Knowledge Distillation}
 Knowledge distillation (KD) is a widely used technique for transferring knowledge from a large, high-capacity \emph{teacher} model to a smaller or more efficient \emph{student} model. Rather than training the student solely on hard class labels, distillation encourages the student to match the teacher’s output distribution, intermediate representations, or both. This process provides additional supervisory signals that can improve convergence, generalization, and sample efficiency, particularly when training compact models.
@@ -244,7 +250,7 @@ Pruning reduces model complexity by removing parameters or structures that contr
 Structured pruning removes entire components such as attention heads, channels, or even transformer layers~\cite{Roth2024ResourceEff}. For vision transformers, common strategies include pruning redundant attention heads, reducing the width of feed-forward networks, or dropping entire encoder blocks in deeper layers. Because the transformer encoder is modular and highly repetitive, it lends itself well to such coarse-grained pruning~\cite{Park2023PTPrune}. Structured pruning produces dense sub-networks that map efficiently onto existing hardware accelerators~\cite{Roth2024ResourceEff}.
 
 \paragraph{Embedded Deployment Considerations:}
-From an embedded systems perspective, the effectiveness of quantization and pruning depends strongly on hardware support and software tooling~\cite{Ngo2025EdgeInference}. Many NPUs and DSPs provide native INT8 or mixed-precision acceleration but offer limited support for sparsity\cite{Roth2024ResourceEff}. Consequently, structured pruning combined with quantization-aware training is often the most practical compression strategy for real-world deployment~\cite{liu2025modelcompression,Jiang2023SingleShot}. When carefully applied, these techniques enable vision transformers to meet strict latency, memory, and power constraints while retaining much of their original representational strength~\cite{Li2023IViT}.
+From an embedded systems perspective, the effectiveness of quantization and pruning depends strongly on hardware support and software tooling~\cite{Ngo2025EdgeInference}. Many NPUs and DSPs provide native INT8 or mixed-precision acceleration but offer limited support for sparsity~\cite{Roth2024ResourceEff}. Consequently, structured pruning combined with quantization-aware training is often the most practical compression strategy for real-world deployment~\cite{liu2025modelcompression,Jiang2023SingleShot}. When carefully applied, these techniques enable vision transformers to meet strict latency, memory, and power constraints while retaining much of their original representational strength~\cite{Li2023IViT}.
 
 \section{Experimental Setup}\label{sec:experimental}
 This section describes the dataset, preprocessing choices, training protocol, and evaluation methodology used to assess the performance and deployability of vision transformer models in an embedded setting. The experimental design emphasizes both biometric accuracy and computational efficiency, reflecting the dual objectives of recognition performance and practical deployment.
@@ -259,12 +265,12 @@ All TinyFace images were resized to a fixed spatial resolution of $96\times96$ p
 
 From a transformer perspective, a $96\times96$ input resolution provides a sufficient number of patch tokens to enable effective self-attention while keeping computational cost manageable. For example, with a patch size of $16\times16$, this resolution yields $6\times6=36$ tokens, striking a balance between spatial expressiveness and efficiency. This choice also aligns with embedded deployment goals, where minimizing token count directly reduces attention complexity and memory usage.
 
-Training augmentations included random horizontal flips, random rotation ($\pm 15\degree$), color jitter (brightness, contrast, saturation, and hue), and random affine translations ($\pm 10\%$). All images were normalized using ImageNet statistics (mean $=[0.485, 0.456, 0.406]$, std $=[0.229, 0.224, 0.225]$)~\cite{russakovsky2015imagenet}. Evaluation used only resizing and normalization without augmentations.
+Training augmentations included random horizontal flips, random rotation ($\pm 15^{\circ}$), color jitter (brightness, contrast, saturation, and hue), and random affine translations ($\pm 10\%$). All images were normalized using ImageNet statistics (mean $=[0.485, 0.456, 0.406]$, std $=[0.229, 0.224, 0.225]$)~\cite{russakovsky2015imagenet}. Evaluation used only resizing and normalization without augmentations.
 
 \subsection{Model Architectures and Configurations}
 Six architecture families were evaluated, spanning pure transformers (DeiT-3, Swin, PVT-v2), hybrid models (MobileViT-v2), modernized CNNs (ConvNeXt), and classical CNNs (ResNet). Table~\ref{tab:arch-specs} summarizes the model variants and their parameter counts.
 
-\begin{table}[!tbp]
+\begin{table}[!htbp]
     \centering
     \begin{tabularx}{\textwidth}{X|C|C|C|C|C|C} \hline
          & \multicolumn{2}{c|}{Base} & \multicolumn{2}{c|}{Small} & \multicolumn{2}{c}{Tiny} \\ \hline
@@ -280,20 +286,49 @@ Six architecture families were evaluated, spanning pure transformers (DeiT-3, Sw
     \label{tab:arch-specs}
 \end{table}
 
-All models were initialized from ImageNet-1k~\cite{russakovsky2015imagenet} pretrained checkpoints provided by the \texttt{timm} library~\cite{wightman2019timm} and adapted to the TinyFace classification task by replacing the classification head. Two training modes were investigated for each architecture: (1) \emph{baseline} training, in which all backbone parameters are updated, and (2) \emph{LoRA} fine-tuning, in which the backbone is frozen and only low-rank adaptation matrices are trained.
+All models were initialized from ImageNet-1k~\cite{russakovsky2015imagenet} pretrained checkpoints provided by the \texttt{timm} library~\cite{wightman2019timm} and adapted to the TinyFace classification task by replacing the classification head. All sixteen variants underwent \emph{baseline} training without adapters, using progressive unfreezing of selected backbone stages or blocks. Two distinct LoRA procedures were also completed: preliminary \emph{standard frozen-backbone LoRA} sweeps on Swin-Base and DeiT3-Base, and final \emph{LoRA with progressive backbone unfreezing} runs across the Swin and DeiT-3 sizes. In the hybrid, adapters and the classification head are trained from the start and selected pretrained backbone modules are subsequently unfrozen. Labels abbreviated to ``LoRA'' in the main test-set results refer to the hybrid; the standard LoRA sweep metrics are identified separately below.
 
 \subsection{Training Protocol}\label{sec:training-protocol}
 Prior to final training runs, Bayesian hyperparameter sweeps were conducted to identify stable and effective configurations for each model family. These sweeps explored learning rate, weight decay, head margin, and LoRA-specific parameters (rank, alpha, dropout), with the goal of identifying hyperparameter regions that produced consistent convergence.
 
-\paragraph{Baseline Training.}
-For baseline experiments, all backbone parameters were trainable. Models were trained for 100 epochs using the AdamW optimizer with a cosine annealing learning rate schedule. Batch sizes of 512 were used with mixed-precision (FP16) training. The AdaFace~\cite{narayan2025petalface} angular margin head was used for all models, with margin and scale parameters tuned per family via the hyperparameter sweeps. The overall training loss is the cross-entropy between the margin-scaled logits and the identity labels.
+\paragraph{Standard Frozen-Backbone LoRA Sweeps.}
+The preliminary AdaFace sweeps trained only the LoRA adapters and classification head, leaving all pretrained backbone weights frozen for the entire run. These runs used 40 epochs, batch size 8, and adapters in the fused QKV projection only, without gradual unfreezing or backbone-bias training. The selected Swin-Base configuration used $(r,\alpha)=(24,120)$ and achieved rank-1 = 0.5814; DeiT3-Base used $(r,\alpha)=(4,24)$ and achieved 0.5891. Both values are from the \emph{EVAL} split used for hyperparameter selection and do not provide a matched test-set comparison with the later hybrid runs.
 
-\paragraph{LoRA Fine-Tuning.}
-For LoRA experiments, the pretrained backbone was frozen and low-rank adaptation matrices were injected into the query, key, value, and output projection layers of each attention block. Following Hu et al.~\cite{hu2022lora}, the LoRA update is
+\paragraph{Baseline Training without Adapters.}
+The architecture survey and the separate six-model comparison against LoRA used AdamW for 50 epochs, an 8-epoch warmup followed by cosine decay, mixed-precision training, and progressive unfreezing at five-epoch intervals. DeiT-3 unfroze its final eight blocks; Swin, ConvNeXt, PVT-v2, and ResNet unfroze their final two stages; MobileViT-v2 unfroze its final three stages. The backbone was initially frozen and only the classification head was trainable. The final Swin and DeiT-3 baseline runs used batch size 8 and AdaFace, as did the non-ResNet architecture-survey runs; the ResNet survey runs used batch size 16 and ArcFace. Margin, scale, and optimizer settings were tuned per family. The training loss is cross-entropy between margin-scaled logits and identity labels. The architecture survey and paired LoRA comparison used distinct run sets, so their baseline accuracy for a given model need not be identical.
+
+\paragraph{LoRA with Progressive Unfreezing.}
+Low-rank adapters were injected into the fused query, key, and value projection and the output projection of every MHSA block. Following Hu et al.~\cite{hu2022lora}, an adapted linear layer computes
 \[
 W' = W + \frac{\alpha}{r} \cdot BA,
 \]
-where $A \in \mathbb{R}^{d \times r}$ and $B \in \mathbb{R}^{r \times d}$ are trainable low-rank factors, $r$ is the rank, and $\alpha$ is a scaling coefficient. Typical swept values were $r \in \{4, 8, 16, 24, 32\}$ and $\alpha \in \{16, 24, 32, 96, 120\}$. LoRA models were trained for 50 epochs with a batch size of 8, a cosine schedule with 8 warmup epochs, and gradual unfreezing of backbone stages every 5 epochs. The learning rate floor was set to $0.1\%$ of the peak value.
+where $W\in\mathbb{R}^{d_{\mathrm{out}}\times d_{\mathrm{in}}}$, $A\in\mathbb{R}^{r\times d_{\mathrm{in}}}$, $B\in\mathbb{R}^{d_{\mathrm{out}}\times r}$, and $\alpha$ scales the rank-$r$ update. The final hybrid runs selected for test evaluation used $(r,\alpha)=(24,120)$ for Swin-T/S, $(8,32)$ for Swin-B, and $(4,24)$ for all DeiT-3 sizes; adapter dropout was 0.05 for Swin and 0.10 for DeiT-3.
+
+Training used AdamW for 50 epochs, batch size 8, an 8-epoch warmup followed by cosine decay, and a learning-rate floor of $0.1\%$ of the peak. Epoch indices below are zero-based. During epochs 0--4, all pretrained backbone weights were frozen; only adapters and the AdaFace classification head were trainable. For Swin, the deepest stage (stage 4) was unfrozen at epoch 5 and the preceding stage (stage 3) at epoch 10; stages 1--2, the patch embedding, and the final normalization remained frozen. For DeiT-3, the final eight of twelve blocks were unfrozen one at a time, deepest first, at epochs 5, 10, $\ldots$, 40. The first four blocks, patch/positional embeddings, classification token, and final normalization remained frozen. Unfreezing enabled every parameter in the selected module, including the original attention projections, FFN, and normalization weights; adapters remained trainable throughout.
+
+Table~\ref{tab:lora-trainability} quantifies the changing trainable share of the original backbone over the full hybrid training schedule. The hybrid becomes substantially less parameter-efficient as unfreezing proceeds, particularly for Swin. The main accuracy comparison measures this hybrid against progressive unfreezing without adapters, with separately tuned hyperparameters; it does not isolate the effect of standard frozen-backbone LoRA.
+
+\begin{table}[!htbp]
+    \centering
+    \small
+    \caption{Trainability of the evaluated standalone LoRA-with-unfreezing runs. Percentages count original backbone parameters only, excluding adapters and the classification head, which remain trainable throughout. Epochs are zero-based. For DeiT-3, the percentage rises by one block every five epochs until epoch 40; Swin has no further unfreezing after epoch 10.}
+    \label{tab:lora-trainability}
+    \begin{tabular}{lrrrrr}
+        \toprule
+        & & \multicolumn{4}{c}{Original backbone trainable (\%)} \\
+        Model & Rank $r$ & Epochs 0--4 & Epochs 5--9 & Epochs 10--14 & Epochs 40--49 \\
+        \midrule
+        Swin-T  & 24 & 0 & 55.84 & 95.65 & 95.65 \\
+        Swin-S  & 24 & 0 & 31.46 & 97.55 & 97.55 \\
+        Swin-B  &  8 & 0 & 31.48 & 97.55 & 97.55 \\
+        DeiT3-S &  4 & 0 &  8.21 & 16.43 & 65.71 \\
+        DeiT3-M &  4 & 0 &  8.24 & 16.49 & 65.95 \\
+        DeiT3-B &  4 & 0 &  8.27 & 16.55 & 66.18 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Test evaluation used the checkpoint with the highest EVAL rank-1, which can precede the final epoch. The selected hybrid Swin-T/S/B checkpoints were from zero-based epochs 25/45/39, after both target stages had been unfrozen. The selected DeiT3-S/M/B checkpoints were from epochs 17/26/8, when 24.64\%/41.22\%/8.27\% of their original backbone parameters had become trainable. Thus, the final-epoch percentages in Table~\ref{tab:lora-trainability} describe the complete training run, not necessarily the selected checkpoint's training history.
 
 \subsection{Knowledge Distillation Setup}\label{sec:kd-setup}
 To evaluate the impact of knowledge distillation on student model performance, a feature-level distillation framework was implemented. The combined training loss is defined as
@@ -309,12 +344,14 @@ Two teacher models, both pretrained on the large-scale WebFace4M dataset, were e
 \end{itemize}
 Both teachers are substantially larger than the student models evaluated in this study (17.4M--87.6M parameters), and their high accuracy stems in part from pretraining on WebFace4M (4.2 million identities), which is orders of magnitude larger than TinyFace. These factors---large model size, high input resolution ($112\times112$ or $120\times120$ vs.\ the student's $96\times96$), and extensive pretraining data---make the teachers impractical for direct deployment on embedded platforms. Knowledge distillation therefore serves as the mechanism to transfer the teachers' representational capacity to smaller, deployable student architectures.
 
-Each teacher was evaluated in two modes: \emph{frozen} (original pretrained weights) and \emph{fine-tuned} (adapted to TinyFace before serving as teacher). During KD training, student images ($96\times96$, ImageNet-normalized) are un-normalized, resized to the teacher's input resolution, and re-normalized to $[-1, 1]$ before being passed to the teacher. The default distillation weight was $\alpha = 0.7$; an ablation study across $\alpha \in \{0.0, 0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0\}$ was conducted to identify optimal mixing ratios.
+Each teacher was evaluated in two modes: \emph{frozen} (original pretrained weights) and \emph{fine-tuned} (adapted to TinyFace before distillation). Student inputs are $96\times96$ images with ImageNet normalization. During KD training, they are un-normalized, resized to the teacher's input resolution, and re-normalized to $[-1, 1]$.
 
-KD student models were trained with the same protocol as LoRA models: 50 epochs, batch size 8, cosine schedule with warmup, and AdamW optimizer. Both baseline (all parameters trainable) and LoRA training modes were evaluated with each teacher configuration.
+The default distillation weight was $\alpha = 0.7$. The ablation study tested eight values: $0.0$, $0.1$, $0.3$, $0.5$, $0.7$, $0.8$, $0.9$, and $1.0$.
+
+KD student models were trained for 50 epochs with batch size 8, an 8-epoch warmup followed by cosine decay, and AdamW. Both \emph{Direct} (without adapters) and \emph{LoRA} (with adapters) modes used the same progressive unfreezing schedule: the final two Swin stages or final eight DeiT-3 blocks, as described in Section~\ref{sec:training-protocol}. In both modes the classification head and student-to-teacher projection were trainable from the start; LoRA adapters, when present, were also trainable throughout. Direct KD follows the no-adapter progressive-unfreezing protocol with the addition of teacher supervision and the feature projection. KD adapters used $(r,\alpha)=(24,120)$ for all Swin sizes and $(4,24)$ for DeiT-3.
 
 \subsection{Evaluation Methodology}
-All models were evaluated using the standard TinyFace gallery--probe protocol. Probe images are matched against a gallery of enrolled identities using cosine similarity of the extracted embeddings. The primary evaluation metrics include:
+All models were evaluated using TinyFace's matching gallery and probes, with distractor gallery images excluded. These results therefore describe a reduced-gallery protocol. Probe images are matched against enrolled identities using cosine similarity of the extracted embeddings. The primary evaluation metrics include:
 \begin{itemize}
     \item \textbf{Rank-$k$ identification rate}: The fraction of probe images for which the correct identity appears within the top $k$ gallery matches, reported for $k = 1$ through $10$.
     \item \textbf{Mean average precision (mAP)}: The mean of per-query average precision scores across all probe images.
@@ -334,77 +371,85 @@ Two quantization schemes were applied:
 \end{itemize}
 All FP32 ONNX exports were validated against the original PyTorch models by computing cosine similarity between output embeddings on a shared calibration set, requiring $>0.999$ similarity. Each quantized model was then independently evaluated on the TinyFace test set using ONNX Runtime inference (CPU) to measure the actual impact of reduced precision on recognition accuracy.
 
+All five deployment configurations were also evaluated directly in TensorRT on the matching gallery and probes, without distractors. The head-pruned DeiT3-S INT8 engine used entropy calibration on 512 training images, excluding validation and test identities; its learned linear projections ran in INT8 while other layers retained floating point.
+
+Runtime resources were measured in three 45-second sustained runs per engine after warm-up, with inputs resident on the GPU. On the Jetson's shared-memory system, peak additional memory was estimated from the reduction in available RAM relative to an idle baseline; reported ranges span the three observed peaks. Energy per inference was obtained by integrating total module input power (\texttt{VDD\_IN}), including idle draw, over the completed inference window~\cite{NVIDIAJetsonPower}.
+
 \subsection{Structured Pruning}\label{sec:pruning-setup}
-To investigate further compression beyond quantization alone, structured pruning was applied systematically across all four architecture families. Five source checkpoints were selected to span both architectures and training regimes: Swin-T Baseline, Swin-T KD Best ($\alpha{=}0.0$), DeiT3-S Baseline, Swin-B Baseline, and DeiT3-B KD Best ($\alpha{=}0.1$). Two structured pruning strategies were evaluated:
+Structured pruning was evaluated on Swin-T, Swin-B, DeiT3-S, and DeiT3-B. Fifteen configurations were derived from five checkpoints: Swin-T Baseline, Swin-T KD Best ($\alpha{=}0.0$), DeiT3-S Baseline, Swin-B Baseline, and DeiT3-B KD Best ($\alpha{=}0.1$, fine-tuned CVLFace teacher). Nine earlier configurations also covered the DeiT3-B baseline and Swin-B with LoRA and progressive unfreezing, giving 24 pruned models in total. Two pruning strategies were evaluated:
 
 \paragraph{Attention Head Pruning.}
-For each multi-head self-attention (MHSA) layer, a per-head importance score is computed as the L2 norm of the concatenated query, key, value, and output projection weight slices associated with that head:
+For each multi-head self-attention (MHSA) layer, a per-head importance score is computed from the entrywise L1 norms of the query, key, value, and output projection weight slices associated with that head:
 \[
-    I_h = \|W^Q_h\|_2 + \|W^K_h\|_2 + \|W^V_h\|_2 + \|W^{\text{proj}}_h\|_2,
+    I_h = \|W^Q_h\|_1 + \|W^K_h\|_1 + \|W^V_h\|_1 + \|W^{\text{proj}}_h\|_1,
 \]
 where $W^Q_h \in \mathbb{R}^{d_k \times d}$ denotes the projection weights for head $h$ of dimension $d_k = d/N_H$. Heads with the lowest importance scores are removed, and the corresponding weight slices are physically deleted from the QKV and output projection matrices. This produces a structurally smaller model with fewer attention heads per layer. Pruning ratios of 10\%, 25\%, and 50\% of heads were evaluated.
 
 \paragraph{Block Dropping.}
-Entire transformer encoder blocks are removed from the model, following a last-first ordering scheme: the deepest blocks are removed first, as later layers in transformers tend to exhibit greater redundancy~\cite{Park2023PTPrune}. For DeiT3-S ($L=12$) and DeiT3-B ($L=12$), 2 and 3 blocks were removed respectively; for Swin-T ($L=12$ across 4 stages) and Swin-B ($L=18$ across 4 stages), 2 and 5 blocks were removed from the later stages.
+Entire transformer encoder blocks are removed using a last-first ordering: the deepest eligible blocks are removed first~\cite{Park2023PTPrune}. For DeiT3-S and DeiT3-B (12 blocks each), 2 and 3 blocks were removed, respectively. For Swin, removal was restricted to its largest stage (stage 3): 2 of its 6 blocks for Swin-T, and 5 of its 18 blocks for Swin-B. The complete Swin-T and Swin-B backbones contain 12 and 24 blocks, respectively.
 
 All pruned models were fine-tuned for 10 epochs with all parameters unfrozen, using AdamW (lr = $3 \times 10^{-5}$, weight decay = 0.05) with cosine annealing, to recover accuracy lost during pruning. Pruned models were then exported to ONNX and quantized to FP16 and INT8 using the same pipeline described in Section~\ref{sec:onnx-quant-setup}, yielding 72 pruned+quantized model variants (24 pruned configurations $\times$ 3 precisions).
 
 \section{Performance Analysis}\label{sec:performance}
-This section presents the experimental results across six lines of evaluation: (1) baseline architecture comparison, (2) parameter-efficient fine-tuning via LoRA, (3) knowledge distillation with multiple teacher configurations, (4) an ablation study on the distillation loss mixing coefficient, (5) ONNX export and quantization of selected models, and (6) structured pruning combined with quantization. Results are analyzed through the lens of both recognition accuracy and model efficiency to inform deployment decisions for embedded systems.
+This section presents the experimental results across six lines of evaluation: (1) baseline architecture comparison, (2) LoRA with progressive backbone unfreezing, (3) knowledge distillation with multiple teacher configurations, (4) an ablation study on the distillation loss mixing coefficient, (5) ONNX export and quantization of selected models, and (6) structured pruning combined with quantization. Results are analyzed through the lens of both recognition accuracy and model efficiency to inform deployment decisions for embedded systems.
 
 \subsection{Baseline Architecture Comparison}
-Sixteen model variants spanning six architecture families were trained on TinyFace using the baseline protocol described in Section~\ref{sec:training-protocol}. Figure~\ref{fig:baseline-comparison} presents the rank-1 identification rates, and Figure~\ref{fig:params-vs-accuracy} shows the relationship between model size and accuracy.
+Sixteen model variants spanning six architecture families were trained on TinyFace using the baseline protocol described in Section~\ref{sec:training-protocol}. Figure~\ref{fig:baseline-comparison} presents the rank-1 identification rates.
 
-\begin{figure}[!tbp]
+\begin{figure}[!hbp]
     \centering
     \includegraphics[width=1.0\linewidth]{baseline_comparison.pdf}
     \caption{Rank-1 identification rate on the TinyFace test set for all 16 baseline model variants, sorted by performance. On this low-resolution dataset, vision transformers (DeiT-3, Swin) outperform CNNs (ResNet, ConvNeXt) and hybrid architectures.}
     \label{fig:baseline-comparison}
 \end{figure}
 
-\begin{figure}[!tbp]
+Several observations follow from the baseline comparison. First, vision transformers outperform CNNs on this low-resolution task. DeiT3-Base achieves the highest rank-1 rate of 0.583, followed by DeiT3-Medium (0.570) and Swin-Tiny (0.562). All three ResNet variants rank at the bottom; ResNet-200 (0.468) performs worst despite having 62.6M parameters. One plausible explanation is that global self-attention provides an advantage when discriminative information must be extracted from severely limited spatial resolution, as is the case with TinyFace's $30\times30$ average native input.
+
+Second, larger models within a family do not always perform better. Swin-Tiny (27.5M parameters, rank-1 = 0.562) outperforms Swin-Base (86.7M, 0.550), and DeiT3-Medium (38.3M, 0.570) is roughly on par with DeiT3-Base (85.8M, 0.583) at less than half the parameter count. For ResNets, scaling from 50 to 200 layers actually \emph{decreases} performance (0.476 $\rightarrow$ 0.468), indicating that additional capacity does not compensate for the architectural limitations of purely local feature extraction at these resolutions. This inverse scaling matters for embedded deployment: smaller transformer variants achieve better accuracy and lower computational cost at the same time.
+
+Figure~\ref{fig:params-vs-accuracy} shows the relationship between model size and accuracy.
+
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{params_vs_accuracy.pdf}
     \caption{Model parameter count versus rank-1 identification rate. Student models (circles) range from 17.4M to 87.6M parameters, while teacher models (stars) used for knowledge distillation are substantially larger (CVLFace 114.9M, PETALface 213.8M). The teachers' size and input resolution requirements make them impractical for embedded deployment, motivating the distillation approach studied in Section~\ref{sec:kd-setup}.}
     \label{fig:params-vs-accuracy}
 \end{figure}
 
-Several observations follow from the baseline comparison. First, vision transformers outperform CNNs on this low-resolution task. DeiT3-Base achieves the highest rank-1 rate of 0.583, followed by DeiT3-Medium (0.570) and Swin-Tiny (0.562). All three ResNet variants rank at the bottom; ResNet-200 (0.468) performs worst despite having 62.6M parameters. One plausible explanation is that global self-attention provides an advantage when discriminative information must be extracted from severely limited spatial resolution, as is the case with TinyFace's $30\times30$ average native input.
-
-Second, larger models within a family do not always perform better. Swin-Tiny (27.5M parameters, rank-1 = 0.562) outperforms Swin-Base (86.7M, 0.550), and DeiT3-Medium (38.3M, 0.570) is roughly on par with DeiT3-Base (85.8M, 0.583) at less than half the parameter count. For ResNets, scaling from 50 to 200 layers actually \emph{decreases} performance (0.476 $\rightarrow$ 0.468), indicating that additional capacity does not compensate for the architectural limitations of purely local feature extraction at these resolutions. This inverse scaling matters for embedded deployment: smaller transformer variants achieve better accuracy and lower computational cost at the same time.
-
 Third, ConvNeXt models, despite incorporating many transformer-inspired design principles, perform only slightly above their ResNet counterparts and substantially below DeiT-3 and Swin. ConvNeXt-Base (87.6M) achieves 0.543, lower than Swin-Tiny at one-third the parameters. At the extremely low input resolutions characteristic of TinyFace, explicit self-attention---not merely large receptive fields or modern training practices---appears to be the dominant factor.
 
 Figure~\ref{fig:params-vs-accuracy} also plots the teacher models used in subsequent knowledge distillation experiments (Section~\ref{sec:kd-setup}). The CVLFace ViT-Base teacher (114.9M parameters) achieves rank-1 rates of 0.716 (frozen) and 0.781 (fine-tuned), while the PETALface Swin teacher (213.8M parameters) achieves 0.424 (frozen) and 0.663 (fine-tuned). Although the teachers offer substantially higher accuracy---particularly after fine-tuning on TinyFace---their parameter counts of 114.9M and 213.8M exceed the largest student models by 30--150\%, placing them well outside the feasible range for embedded deployment. This performance--size gap motivates the use of knowledge distillation to transfer teacher-level representational capacity to compact student architectures.
 
-\subsection{Parameter-Efficient Fine-Tuning with LoRA}
-Following the baseline comparison, the top-performing architecture families (Swin and DeiT-3) were fine-tuned using LoRA as described in Section~\ref{sec:training-protocol}. Figure~\ref{fig:baseline-vs-lora} compares baseline and LoRA results, and Figure~\ref{fig:cmc-curves} presents CMC curves for selected top models alongside a ResNet-50 reference.
+\subsection{LoRA with Progressive Backbone Unfreezing}
+Following the baseline comparison, the top-performing architecture families (Swin and DeiT-3) were fine-tuned using LoRA with progressive backbone unfreezing as described in Section~\ref{sec:training-protocol}. Test-set results compare the final hybrid runs with their separate no-adapter baselines. The standard frozen-backbone LoRA sweep results reported in Section~\ref{sec:training-protocol} use the EVAL split and are not plotted in this figure.
 
-\begin{figure}[!tbp]
+The results show an architecture-dependent response to LoRA with progressive unfreezing. For Swin models, the hybrid protocol consistently improves accuracy over the baseline: Swin-Tiny improves from 0.534 to 0.562 ($+$0.028 rank-1), Swin-Small from 0.539 to 0.554 ($+$0.015), and Swin-Base from 0.526 to 0.536 ($+$0.010). DeiT-3 models exhibit the opposite trend: the hybrid protocol degrades performance for DeiT3-Small (0.552 $\rightarrow$ 0.527, $-$0.025), DeiT3-Medium (0.570 $\rightarrow$ 0.533, $-$0.037), and DeiT3-Base (0.583 $\rightarrow$ 0.550, $-$0.033). Figure~\ref{fig:baseline-vs-lora} summarizes this comparison.
+
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{baseline_vs_lora.pdf}
-    \caption{Comparison of baseline (full fine-tuning) and LoRA fine-tuning across Swin and DeiT-3 model variants. LoRA improves Swin models but degrades DeiT-3 performance, revealing an architecture-dependent response to parameter-efficient adaptation.}
+    \caption{Test-set comparison of progressive backbone unfreezing without adapters (Baseline) and with LoRA adapters (LoRA) across Swin and DeiT-3 variants. The hybrid improves Swin models but degrades DeiT-3 performance under the separately tuned configurations. Standard frozen-backbone LoRA sweep metrics are not included.}
     \label{fig:baseline-vs-lora}
 \end{figure}
 
-\begin{figure}[!tbp]
+Architectural differences may contribute to this divergence, but the experiment does not isolate their effect. Swin's hierarchical local-window attention and DeiT-3's global MHSA operate with different unfreezing schedules and final trainable fractions (Table~\ref{tab:lora-trainability}). Each paired baseline and hybrid shared batch size, training duration, and unfreezing schedule, but used separately tuned optimizer, dropout, and head settings. Because unfrozen weights receive unrestricted updates, these results do not demonstrate that a low-rank constraint alone improves Swin or limits DeiT-3. The earlier frozen-backbone sweeps used a different split, duration, and adapter targeting, so they do not supply a matched test-set control for that explanation.
+
+The CMC curves show that the DeiT3-Base baseline leads at every plotted rank: its rank-1/rank-10 rates are 0.583/0.741, compared with 0.550/0.710 for DeiT3-Base with LoRA and unfreezing. Swin-Tiny improves from 0.534/0.707 to 0.562/0.727 under the hybrid protocol. All four transformer configurations outperform the plotted ResNet-50 baseline across ranks 1--10, showing that their advantage extends beyond rank-1 identification in this evaluation (Figure~\ref{fig:cmc-curves}).
+
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{cmc_curves.pdf}
-    \caption{Cumulative match characteristic (CMC) curves for the top-performing models compared to a ResNet-50 baseline. DeiT3-Base with LoRA achieves the highest identification rates across all ranks.}
+    \caption{Cumulative match characteristic (CMC) curves for selected baseline and LoRA-with-unfreezing models compared to ResNet-50. The DeiT3-Base baseline has the highest identification rate at every plotted rank.}
     \label{fig:cmc-curves}
 \end{figure}
 
-The LoRA results show an architecture-dependent response to parameter-efficient fine-tuning. For Swin models, LoRA consistently improves accuracy over the baseline: Swin-Tiny improves from 0.534 to 0.562 ($+$0.028 rank-1), Swin-Small from 0.539 to 0.554 ($+$0.015), and Swin-Base from 0.526 to 0.536 ($+$0.010). DeiT-3 models exhibit the opposite trend: LoRA degrades performance for DeiT3-Small (0.552 $\rightarrow$ 0.527, $-$0.025), DeiT3-Medium (0.570 $\rightarrow$ 0.533, $-$0.037), and DeiT3-Base (0.583 $\rightarrow$ 0.550, $-$0.033).
-
-This divergence may be attributed to architectural differences in how Swin and DeiT-3 process information. Swin Transformer's hierarchical structure with local window attention may benefit from the regularization effect of LoRA's low-rank constraint, which prevents overfitting while still adapting attention patterns. DeiT-3's columnar architecture with global attention across all layers may already be well-adapted to the task via full fine-tuning, and constraining updates to a low-rank subspace may limit its ability to make the necessary adjustments to its global attention patterns for this domain.
-
-The CMC curves in Figure~\ref{fig:cmc-curves} further illustrate these dynamics. DeiT3-Base with LoRA achieves the highest cumulative identification rates, surpassing even the DeiT3-Base baseline at higher ranks ($k \geq 2$). Both DeiT3-Base configurations substantially outperform the ResNet-50 baseline, which lags by approximately 0.10 in rank-1. The consistent gap between transformer and CNN models across all ranks confirms that the advantage of self-attention generalizes beyond rank-1 accuracy.
-
 \subsection{Knowledge Distillation Results}
 
-Knowledge distillation experiments were conducted for all Swin and DeiT-3 student models using both CVLFace and PETALface teachers in frozen and fine-tuned modes. Table~\ref{tab:kd-results} summarizes the key results.
+Knowledge distillation experiments were conducted for all Swin and DeiT-3 student models using both CVLFace and PETALface teachers in frozen and fine-tuned modes.
 
-\begin{table}[!tbp]
+Several findings emerge from the distillation study. First, KD with the default $\alpha = 0.7$ provides only marginal improvements for Swin students ($+$0.000 to $+$0.005 rank-1) and slight degradation for DeiT-3 students ($-$0.003 to $-$0.011). The higher-accuracy teacher (CVLFace ViT-Base, rank-1 = 0.716 frozen, 0.781 fine-tuned) does not translate its substantial performance advantage into student accuracy at this default mixing ratio. On this dataset the bottleneck appears to lie in the student's capacity to extract discriminative features from a $96\times96$ input rather than in the quality of the supervisory signal. Table~\ref{tab:kd-results} summarizes the key results.
+
+\begin{table}[!htbp]
     \centering
     \caption{Knowledge distillation results (rank-1) compared to standalone training. \emph{Best B/L} refers to the better of baseline or LoRA for each model. The best KD result across all teacher configurations is shown. $\Delta$ indicates the change from the best non-KD result to the best KD result. Default $\alpha = 0.7$.}
     \label{tab:kd-results}
@@ -422,26 +467,24 @@ Knowledge distillation experiments were conducted for all Swin and DeiT-3 studen
     \end{tabular*}
 \end{table}
 
-Several findings emerge from the distillation study. First, KD with the default $\alpha = 0.7$ provides only marginal improvements for Swin students ($+$0.000 to $+$0.005 rank-1) and slight degradation for DeiT-3 students ($-$0.003 to $-$0.011). The higher-accuracy teacher (CVLFace ViT-Base, rank-1 = 0.716 frozen, 0.781 fine-tuned) does not translate its substantial performance advantage into student accuracy at this default mixing ratio. On this dataset the bottleneck appears to lie in the student's capacity to extract discriminative features from a $96\times96$ input rather than in the quality of the supervisory signal.
-
 Second, teacher fine-tuning does not reliably improve student performance. Fine-tuning dramatically improves the teacher's own accuracy (CVLFace: $0.716 \rightarrow 0.781$; PETALface: $0.424 \rightarrow 0.663$), but the resulting KD students perform inconsistently, sometimes better and sometimes worse than those trained with frozen teachers. This challenges the common assumption that a stronger teacher necessarily produces a stronger student.
 
 Third, the teacher architecture matters but not in the expected direction. Despite PETALface achieving substantially lower accuracy on TinyFace (rank-1 = 0.424 frozen vs.\ CVLFace's 0.716), it occasionally produces competitive students, particularly for Swin-Tiny with LoRA (rank-1 = 0.567). One explanation is a same-architecture inductive-bias benefit (Swin teacher $\rightarrow$ Swin student) over cross-architecture transfer (ViT teacher $\rightarrow$ Swin student); another is that the PETALface teacher's lower TinyFace accuracy does not fully reflect the usefulness of its intermediate feature representations for guiding student training.
 
-Finally, a Swin LoRA collapse was observed: Swin-Small and Swin-Base with LoRA + KD consistently degraded to rank-1 values of 0.35--0.41 across both teacher types, indicating a systematic instability when combining LoRA's gradual unfreezing with KD supervision for larger Swin models. Only Swin-Tiny escaped this collapse.
+Finally, several Swin-Small and Swin-Base runs combining LoRA, progressive unfreezing, and KD degraded to rank-1 values of 0.35--0.41 across both teacher types. This instability was not universal: Swin-Small with the fine-tuned CVLFace teacher achieved 0.559 (Table~\ref{tab:kd-results}). The results identify a sensitivity of the combined training protocol; they do not isolate LoRA, unfreezing, or KD as its cause.
 
 \subsection{Distillation Loss Mixing Ablation}
 
 The default mixing coefficient $\alpha = 0.7$ was selected based on common practice~\cite{hinton2015distillation}; however, the modest KD gains in the previous section motivated a systematic ablation. Four representative configurations were swept across $\alpha \in \{0.0, 0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0\}$, where $\alpha = 0.0$ corresponds to pure KD loss and $\alpha = 1.0$ to pure cross-entropy (no distillation). Figure~\ref{fig:alpha-ablation} presents the results, and Table~\ref{tab:alpha-optimal} summarizes the optimal configurations.
 
-\begin{figure}[!tbp]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{alpha_ablation.pdf}
     \caption{Effect of the distillation loss mixing coefficient $\alpha$ on rank-1 identification rate across four student--teacher configurations. The default $\alpha = 0.7$ is suboptimal for all configurations; lower values favoring the KD loss produce the best results.}
     \label{fig:alpha-ablation}
 \end{figure}
 
-\begin{table}[!tbp]
+\begin{table}[!htbp]
     \centering
     \caption{Optimal distillation mixing coefficient $\alpha$ for each configuration. In all cases, the commonly used $\alpha = 0.7$ is suboptimal. The rightmost column shows the improvement from tuning $\alpha$.}
     \label{tab:alpha-optimal}
@@ -465,7 +508,7 @@ For the mid-range $\alpha$ values (0.1--0.9), performance is remarkably stable, 
 
 Figure~\ref{fig:kd-overview} summarizes the overall impact of knowledge distillation, comparing each model's best standalone result, best KD result with the default $\alpha = 0.7$, and best KD result with tuned $\alpha$.
 
-\begin{figure}[!tbp]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{kd_overview.pdf}
     \caption{Knowledge distillation impact: comparison of best standalone training, best KD with default $\alpha = 0.7$, and best KD with optimally tuned $\alpha$. Alpha tuning produces substantial improvements for Swin-T and DeiT3-B.}
@@ -476,9 +519,9 @@ Figure~\ref{fig:kd-overview} summarizes the overall impact of knowledge distilla
 
 Table~\ref{tab:quant-results} reports the effect of post-training quantization on four representative models spanning two architectures and three training regimes.
 
-\begin{table}[!tbp]
+\begin{table}[!htbp]
     \centering
-    \caption{Post-training quantization results. FP16 conversion is effectively lossless across all models. INT8 dynamic quantization induces rank-1 drops of at most 0.0016 (absolute) and in one case produces a slight improvement ($+$0.0008 rank-1 for DeiT3-B KD).}
+    \caption{Post-training quantization results. FP16 changes rank-1 by at most 0.0005 across these four unpruned examples. INT8 dynamic quantization induces rank-1 drops of at most 0.0016 (absolute) and in one case produces a slight improvement ($+$0.0008 rank-1 for DeiT3-B KD).}
     \label{tab:quant-results}
     \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c}
         \toprule
@@ -486,34 +529,36 @@ Table~\ref{tab:quant-results} reports the effect of post-training quantization o
         \midrule
         \multirow{3}{*}{Swin-T Baseline}
             & FP32 & 106.9 & 0.5335 & --- \\
-            & FP16 &  54.1 & 0.5335 &  0.000 \\
-            & INT8 &  28.3 & 0.5322 & $-$0.001 \\
+            & FP16 &  54.1 & 0.5335 &  0.0000 \\
+            & INT8 &  28.3 & 0.5322 & $-$0.0013 \\
         \midrule
         \multirow{3}{*}{Swin-T KD (CVLFace)}
             & FP32 & 106.9 & 0.5491 & --- \\
-            & FP16 &  54.1 & 0.5494 & $+$0.000 \\
-            & INT8 &  28.3 & 0.5475 & $-$0.002 \\
+            & FP16 &  54.1 & 0.5494 & $+$0.0003 \\
+            & INT8 &  28.3 & 0.5475 & $-$0.0016 \\
         \midrule
         \multirow{3}{*}{DeiT3-B KD (CVLFace)}
             & FP32 & 327.7 & 0.5719 & --- \\
-            & FP16 & 164.2 & 0.5714 & $-$0.001 \\
-            & INT8 &  84.6 & 0.5727 & $+$0.001 \\
+            & FP16 & 164.2 & 0.5714 & $-$0.0005 \\
+            & INT8 &  84.6 & 0.5727 & $+$0.0008 \\
         \midrule
         \multirow{3}{*}{DeiT3-B LoRA}
             & FP32 & 327.7 & 0.5496 & --- \\
-            & FP16 & 164.2 & 0.5496 &  0.000 \\
-            & INT8 &  84.6 & 0.5486 & $-$0.001 \\
+            & FP16 & 164.2 & 0.5496 &  0.0000 \\
+            & INT8 &  84.6 & 0.5486 & $-$0.0010 \\
         \bottomrule
     \end{tabular*}
 \end{table}
 
-FP16 conversion is lossless for all models, with cosine similarity between FP32 and FP16 embeddings exceeding 0.9999 in every case. This is expected: half-precision provides sufficient dynamic range for inference-only workloads where no gradient accumulation occurs.
+FP16 conversion is near-lossless for these four models: the largest absolute rank-1 change is 0.0005, and embedding cosine similarity to FP32 exceeds 0.9999. High embedding similarity does not imply exactly identical nearest-neighbor rankings.
 
-INT8 dynamic quantization introduces minimal accuracy degradation, with rank-1 changes ranging from $-$0.0016 to $+$0.0008 (mean $-$0.0005). The DeiT3-B KD model exhibits a slight \emph{improvement} under INT8 quantization ($+$0.0008 rank-1), likely due to the regularizing effect of weight quantization noise on an already well-conditioned embedding space. Both FP16 and INT8 quantization are therefore viable for deployment without meaningful accuracy loss on this task.
+INT8 dynamic quantization changes rank-1 by $-$0.0016 to $+$0.0008 (mean $-$0.0008) across these four models. The small increase for DeiT3-B KD is an observed change, without repeated trials to establish an accuracy benefit. These results support FP16 for inference and dynamic INT8 for file-size reduction, subject to the target runtime; dynamic INT8 is distinct from TensorRT's calibration-based GPU INT8 path.
 
-In terms of model size, INT8 quantization achieves $3.8$--$3.9\times$ compression relative to FP32: Swin-Tiny is reduced from 106.9\,MB to 28.3\,MB, while DeiT3-Base is reduced from 327.7\,MB to 84.6\,MB---bringing it within range of memory-constrained embedded platforms. Figure~\ref{fig:size-reduction} illustrates the cumulative size reduction from FP32 through FP16 to INT8 across all baseline models. Compression ratios are consistent across architectures ($3.7$--$3.9\times$ from FP32 to INT8), reflecting the uniform precision reduction of dense linear layers rather than any architecture-specific factor.
+In terms of model size, INT8 quantization achieves $3.8$--$3.9\times$ compression relative to FP32: Swin-Tiny is reduced from 106.9\,MB to 28.3\,MB, while DeiT3-Base is reduced from 327.7\,MB to 84.6\,MB---bringing it within range of memory-constrained embedded platforms. Compression ratios are consistent across architectures ($3.7$--$3.9\times$ from FP32 to INT8), reflecting the uniform precision reduction of dense linear layers rather than any architecture-specific factor.
 
-\begin{figure}[!tbp]
+Figure~\ref{fig:size-reduction} illustrates the cumulative size reduction from FP32 through FP16 to INT8 across all baseline models.
+
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{size_reduction_waterfall.pdf}
     \caption{Model size reduction from FP32 through FP16 to INT8 quantization for all TRT-compatible baseline models. Compression ratios (annotated above INT8 bars) are consistent at $3.7$--$3.9\times$ across architectures.}
@@ -524,7 +569,7 @@ In terms of model size, INT8 quantization achieves $3.8$--$3.9\times$ compressio
 
 Table~\ref{tab:pruning-results} summarizes the pruning and quantization results across all four architectures, comparing baseline and best-KD source checkpoints for each.
 
-\begin{table}[!tbp]
+\begin{table}[!htbp]
     \centering
     \caption{Structured pruning + INT8 quantization results across four architectures. Rank-1 accuracy and compression ratio are relative to the corresponding unpruned FP32 model. Bold entries \emph{improve} over the unpruned baseline. $^\dagger$Block dropping improves accuracy, suggesting depth over-parameterization. $^\ddagger$Head pruning on the KD ($\alpha{=}0.0$) checkpoint is catastrophically unstable (see text).}
     \label{tab:pruning-results}
@@ -534,15 +579,15 @@ Table~\ref{tab:pruning-results} summarizes the pruning and quantization results 
         Source Model & Pruning & Prec. & Size (MB) & Ratio & rank-1 \\
         \midrule
         \multicolumn{6}{l}{\textit{Swin-T (27.5\,M params)}} \\
-        \multirow{4}{*}{\quad Baseline (0.534)}
-            & 10\% heads  & INT8 &  27.8 & 3.84$\times$ & 0.499 \\
+        \multirow{3}{*}{\quad Baseline (0.534)}
+            & 10\% heads  & INT8 &  27.8 & 3.85$\times$ & 0.499 \\
             & 25\% heads  & INT8 &  26.7 & 4.00$\times$ & 0.465 \\
-            & 2 blocks$^\dagger$ & INT8 &  24.6 & 4.34$\times$ & \textbf{0.543} \\
+            & 2 blocks$^\dagger$ & INT8 &  24.6 & 4.35$\times$ & \textbf{0.543} \\
         \cmidrule(l){2-6}
-        \multirow{4}{*}{\quad KD ($\alpha{=}0.0$, 0.616)}
-            & 10\% heads$^\ddagger$ & INT8 &  27.8 & 3.84$\times$ & 0.403 \\
+        \multirow{3}{*}{\quad KD ($\alpha{=}0.0$, 0.616)}
+            & 10\% heads$^\ddagger$ & INT8 &  27.8 & 3.85$\times$ & 0.403 \\
             & 25\% heads$^\ddagger$ & INT8 &  26.7 & 4.00$\times$ & 0.381 \\
-            & 2 blocks$^\dagger$ & INT8 &  24.6 & 4.34$\times$ & \textbf{0.583} \\
+            & 2 blocks & INT8 &  24.6 & 4.35$\times$ & 0.583 \\
         \midrule
         \multicolumn{6}{l}{\textit{DeiT3-S (21.7\,M params)}} \\
         \multirow{3}{*}{\quad Baseline (0.552)}
@@ -562,7 +607,7 @@ Table~\ref{tab:pruning-results} summarizes the pruning and quantization results 
             & 25\% heads  & INT8 &  77.8 & 4.21$\times$ & 0.566 \\
             & 3 blocks    & INT8 &  64.0 & 5.12$\times$ & 0.548 \\
         \cmidrule(l){2-6}
-        \multirow{4}{*}{\quad LoRA (0.583)}
+        \multirow{4}{*}{\quad Baseline (0.583)}
             & 10\% heads  & INT8 &  82.0 & 4.00$\times$ & \textbf{0.586} \\
             & 25\% heads  & INT8 &  77.8 & 4.21$\times$ & 0.564 \\
             & 50\% heads  & INT8 &  71.0 & 4.62$\times$ & 0.510 \\
@@ -573,45 +618,54 @@ Table~\ref{tab:pruning-results} summarizes the pruning and quantization results 
 
 Several findings emerge from the comprehensive pruning experiments across all four architectures:
 
-\paragraph{Block dropping consistently outperforms head pruning.}
-Across all four architectures, removing entire transformer blocks preserves accuracy better than pruning attention heads at equivalent parameter reduction. Block dropping \emph{improves} accuracy for Swin-T Baseline ($+$0.010), Swin-B Baseline ($+$0.028), and DeiT3-S ($+$0.013 at 10\% heads), suggesting these models are over-parameterized in depth for this low-resolution task. Head pruning, by contrast, degrades all Swin variants substantially, while DeiT3 models tolerate moderate head removal.
+\paragraph{The preferred pruning axis depends on the architecture.}
+Block dropping improves the Swin-T and Swin-B baselines by $+$0.010 and $+$0.028 rank-1 at INT8, respectively, while head pruning degrades both. DeiT3-S instead benefits from 10\% head pruning ($+$0.013) and loses accuracy under block dropping. DeiT3-B KD similarly retains more accuracy with 10\% head pruning (0.591) than with three blocks removed (0.548). These tested removal levels are not matched for parameter reduction; they support an architecture-dependent choice rather than a universal ranking of pruning methods.
 
 \paragraph{DeiT3 is more robust to head pruning than Swin.}
-DeiT3-S with 10\% head pruning improves rank-1 from 0.552 to 0.565 ($+$0.013), and DeiT3-B KD retains 0.591 out of 0.593. Swin-T head pruning degrades from 0.534 to 0.500 (10\%) and 0.465 (25\%), and Swin-B from 0.526 to 0.487 (10\%) and 0.454 (25\%). The pattern is consistent with global self-attention (DeiT3) distributing learned features more uniformly across heads than hierarchical window attention (Swin), making DeiT3 more amenable to uniform head removal.
+DeiT3-S with 10\% head pruning improves rank-1 from 0.552 to 0.565 ($+$0.013), and DeiT3-B KD retains 0.591 out of 0.593. At INT8, Swin-T head pruning degrades from its FP32 source rate of 0.534 to 0.499 (10\%) and 0.465 (25\%), and Swin-B from 0.526 to 0.488 (10\%) and 0.453 (25\%). The pattern is consistent with global self-attention (DeiT3) distributing learned features more uniformly across heads than hierarchical window attention (Swin), making DeiT3 more amenable to uniform head removal.
 
 \paragraph{KD-distilled Swin-T is catastrophically sensitive to head pruning.}
 Head pruning on the best Swin-T KD checkpoint ($\alpha{=}0.0$, rank-1 = 0.616) produces a catastrophic collapse: 10\% head removal drops accuracy to 0.403 ($-$0.213), and 25\% to 0.381 ($-$0.235). This is far worse than pruning the weaker Swin-T Baseline (0.534 $\to$ 0.500 at 10\%). Block dropping on the same KD checkpoint, however, retains most of the accuracy (0.583), so the collapse is specific to head removal. A plausible explanation is that pure feature distillation ($\alpha{=}0.0$) concentrates learned representations into fewer heads, making the remaining heads critical---and therefore highly sensitive to removal. The implication for practitioners combining KD with pruning is that the distillation method and the pruning strategy must be co-designed.
 
 \paragraph{Block dropping on Swin-B confirms depth redundancy.}
-Removing 5 of 18 blocks from Swin-Base increases rank-1 from 0.526 to 0.554 ($+$0.028) at INT8 precision. Combined with the same finding from earlier LoRA-based experiments (0.536 $\to$ 0.572), the pattern appears robust to the source checkpoint. Block dropping consistently improves Swin-B regardless of training regime, confirming that Swin-Base is systematically over-parameterized in depth for this 96$\times$96 input task.
+Removing 5 of the 18 blocks in Swin-Base's third stage increases rank-1 from 0.526 to 0.554 ($+$0.028) at INT8. The earlier hybrid-LoRA source likewise improves from 0.536 to 0.572 after block dropping and recovery fine-tuning. Both observed checkpoints therefore support depth reduction for this $96\times96$ task, although the experiment does not isolate the effects of block removal from subsequent fine-tuning.
 
 \paragraph{INT8 quantization remains stable on pruned models.}
-Across all 24 pruned models, INT8 quantization induces a mean absolute rank-1 change of $<$0.003, and several models show negligible improvement under INT8. The largest drop (0.0099 rank-1 for DeiT3-S 25\% heads) is an outlier; the median change is 0.0003 rank-1. Pruning and quantization compose well and can be applied jointly without compounding accuracy losses.
+Across all 24 pruned models, INT8 introduces a mean absolute rank-1 change of 0.0017 and a median absolute change of 0.0013 relative to each pruned FP32 model. The largest drop is 0.0099 for DeiT3-S with 25\% head pruning (0.5515 to 0.5416); the largest increase is 0.0014. FP16 changes rank-1 by at most 0.0008. Quantization therefore adds a small accuracy change in most cases, but the unpruned four-model loss bound of 0.0016 does not apply to every pruned model.
 
 Figure~\ref{fig:pruning-method} compares pruning strategies across all four architectures.
 
-\begin{figure}[!tbp]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{pruning_method_comparison.pdf}
-    \caption{Comparison of pruning methods across all four architectures (FP32). Red dashed lines indicate the unpruned baseline accuracy. Block dropping (removing entire transformer blocks) consistently outperforms head pruning and in three architectures (Swin-T, Swin-B, DeiT3-S at 10\% heads) \emph{improves} upon the unpruned model, confirming systematic depth over-parameterization on this 96$\times$96 task.}
+    \caption{Comparison of pruning methods across four model variants (FP32). Red dashed lines indicate the unpruned baseline accuracy. Block dropping improves the Swin-T and Swin-B baselines, whereas DeiT3-S benefits from 10\% head pruning. The preferred pruning axis therefore depends on the architecture.}
     \label{fig:pruning-method}
 \end{figure}
 
-\paragraph{Compression--accuracy trade-off summary.}
-Across the full pruning$\times$quantization space, several Pareto-optimal configurations emerge. For absolute accuracy, DeiT3-B KD ($\alpha{=}0.1$) with 10\% head pruning at INT8 achieves 0.591 rank-1 at 82\,MB ($4.0\times$ compression), preserving nearly all accuracy. For small models, Swin-T KD ($\alpha{=}0.0$) with 2 blocks removed at INT8 delivers 0.583 rank-1 at just 24.6\,MB---retaining 94.6\% of the unpruned KD model's accuracy in a package suitable for edge devices. For maximum compression with competitive accuracy, Swin-B with 5 blocks removed at INT8 delivers 0.554 rank-1 at 71.2\,MB ($4.7\times$), outperforming the unpruned Swin-B baseline. DeiT3-S at 10\% heads, INT8 achieves 0.565 rank-1 at 21.7\,MB ($3.8\times$), the smallest model that exceeds its unpruned counterpart. FP16 quantization is consistently lossless across all pruned models, and INT8 introduces at most 0.01 rank-1 of additional degradation (typically $<$0.001), confirming that pruning and quantization compose well.
+\paragraph{Compression and accuracy.}
+Among the pruned INT8 configurations, DeiT3-B KD ($\alpha{=}0.1$) with 10\% head pruning at INT8 achieves 0.591 rank-1 at 82\,MB ($4.0\times$ compression), preserving nearly all accuracy. For small models, Swin-T KD ($\alpha{=}0.0$) with 2 blocks removed at INT8 delivers 0.583 rank-1 at just 24.6\,MB---retaining 94.6\% of the unpruned KD model's accuracy in a package suitable for edge devices. For maximum compression with competitive accuracy, Swin-B with 5 blocks removed at INT8 delivers 0.554 rank-1 at 71.2\,MB ($4.7\times$), outperforming the unpruned Swin-B baseline. DeiT3-S at 10\% heads, INT8 achieves 0.565 rank-1 at 21.7\,MB ($3.8\times$), the smallest model that exceeds its unpruned counterpart. Relative to pruned FP32, the maximum absolute FP16 change is 0.0008 and the maximum INT8 loss is 0.0099. These file-size reductions should be considered alongside each configuration's accuracy and runtime support.
 
 \subsection{On-Device Inference and TensorRT Compatibility}\label{sec:trt-compat}
 
 All trained models were deployed to an NVIDIA Jetson Orin Nano (8\,GB, JetPack 6.4, TensorRT 10.3, CUDA 12.6, SM compute capability 8.7) for hardware-in-the-loop latency evaluation. Inference is performed at batch size 1 with fixed $96\times96$ input resolution, reflecting a realistic single-image query scenario in a surveillance or access-control system.
 
 \paragraph{Initial TRT Conversion Outcome.}
-Of the sixteen baseline architectures, nine---the Swin and DeiT-3 families and the ResNet-D baselines---converted directly from opset-18 ONNX to native TensorRT FP32 and FP16 engines using \texttt{trtexec}. The remaining seven---ConvNeXt-T/S/B, PVT-v2-B2/B3/B5, and MobileViT-v2-200---failed standalone conversion with a \texttt{ForeignNode}/no-implementation error rooted in a normalization-layout mismatch (analyzed below). A per-family graph-rewrite procedure (Section~\ref{sec:trt-compat-success}) ultimately allowed all sixteen architectures to execute as native TensorRT engines with cosine similarity $\geq 0.999$ relative to the original PyTorch outputs. The unified per-model latency results are reported in Table~\ref{tab:jetson-latency-full} and Figure~\ref{fig:latency-comparison}.
+Of the sixteen baseline architectures, nine---the Swin and DeiT-3 families and the ResNet-D baselines---converted directly from opset-18 ONNX to native TensorRT FP32 and FP16 engines using \texttt{trtexec}. The remaining seven---ConvNeXt-T/S/B, PVT-v2-B2/B3/B5, and MobileViT-v2-200---failed standalone conversion with a \texttt{ForeignNode}/no-implementation error rooted in a normalization-layout mismatch (analyzed below). A per-family graph-rewrite procedure (Section~\ref{sec:trt-compat-success}) ultimately allowed all sixteen architectures to execute as native TensorRT engines with cosine similarity $\geq 0.999$ relative to the original PyTorch outputs. The unified per-model latency results are reported in Table~\ref{tab:jetson-latency-full}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Unified native TensorRT inference latency on the Jetson Orin Nano (batch size 1, $96\times96$ input, MAXN\_SUPER, locked clocks). All sixteen baseline architectures execute as native TRT engines after applying the per-family rewrites of Section~\ref{sec:trt-compat-success} where required.}
+\label{tab:jetson-latency-full}
+\footnotesize
+\input{figures/jetson_unified_table.tex}
+\end{table}
 
 \paragraph{Architecturally Incompatible Models.}
 The seven failing architectures all aborted \texttt{trtexec} conversion with the error:
 
 \begin{quote}
-\texttt{Could not find any implementation for node \{ForeignNode[Transpose $\cdots$ Transpose]\}.}
+\texttt{Could not find any implementation for node}\\
+\{\texttt{ForeignNode[Transpose $\cdots$ Transpose]}\}.
 \end{quote}
 
 The root cause is a normalization pattern unique to these architectures. In standard ViTs like Swin and DeiT-3, layer normalization is applied to $(B,N,C)$ token sequences, which maps naturally to TensorRT's native \texttt{LayerNormalization} kernel along the channel axis. ConvNeXt and PVT-v2, however, apply layer normalization to NCHW spatial feature maps. In timm's implementation, this is realized by permuting the tensor to NHWC format, applying \texttt{F.layer\_norm}, then permuting back: \texttt{Transpose(0,2,3,1) $\rightarrow$ LayerNorm $\rightarrow$ Transpose(0,3,1,2)}. MobileViT-v2 uses an analogous \texttt{GroupNorm(num\_groups=1)}, which normalizes across all non-batch spatial dimensions and incurs the same layout issues.
@@ -621,7 +675,7 @@ TensorRT 10.3 on SM 8.7 contains no kernel that implements \texttt{LayerNormaliz
 \paragraph{A Practitioner's Guide to the Fix.}\label{sec:trt-compat-success}
 The pitfalls below were identified in the course of getting the seven failing architectures to compile, and they generalise to any modern ConvNet--Transformer hybrid that is not specifically targeted at TensorRT~10.x on SM~8.7. The takeaway, which we elaborate in the rest of this paragraph, is that the only reliable fix is a per-family module-level rewrite that presents TensorRT with the supported $(B,N,C)$ \texttt{LayerNormalization} pattern. Workarounds that operate purely at the ONNX or opset level do not work on this hardware.
 
-\paragraph{Opset upgrades and operator decomposition do not help.} Lowering the export opset so that \texttt{LayerNormalization} is decomposed into its constituent arithmetic (ReduceMean, Sub, Pow, Sqrt, Div, Mul, Add) seems like it should remove the offending op, but TensorRT's Myelin compiler re-fuses the entire arithmetic subgraph back into the same unsupported \texttt{ForeignNode}. Conversely, exporting at the higher opset~17 with the native \texttt{LayerNormalization} op preserves the surrounding \texttt{Transpose $\rightarrow$ LayerNorm $\rightarrow$ Transpose} pattern, which TensorRT also has no kernel for in either FP32 or FP16. The diagnosis is the same in both cases: there is no SM~8.7 kernel for any non-$(B,N,C)$ LayerNorm, regardless of how the graph spells it.
+\paragraph{Opset changes and decomposition.} Lowering the export opset so that \texttt{LayerNormalization} is decomposed into its constituent arithmetic (ReduceMean, Sub, Pow, Sqrt, Div, Mul, Add) seems like it should remove the offending op, but TensorRT's Myelin compiler re-fuses the entire arithmetic subgraph back into the same unsupported \texttt{ForeignNode}. Conversely, exporting at the higher opset~17 with the native \texttt{LayerNormalization} op preserves the surrounding \texttt{Transpose $\rightarrow$ LayerNorm $\rightarrow$ Transpose} pattern, which TensorRT also has no kernel for in either FP32 or FP16. The diagnosis is the same in both cases: there is no SM~8.7 kernel for any non-$(B,N,C)$ LayerNorm, regardless of how the graph spells it.
 
 \paragraph{Watch the dynamo exporter on TensorRT~10.x.} PyTorch's dynamo-based ONNX exporter rewrites the normalization to operate on a reshaped 3-D tensor, which is exactly what TensorRT wants, but in the process it inserts \texttt{SequenceEmpty} and \texttt{Loop} operators (from dynamic-shape handling) that TensorRT~10.3 cannot parse, so the engine build aborts before optimisation begins. The legacy TorchScript exporter at opset~17 is generally the safer default for TensorRT targets.
 
@@ -633,60 +687,43 @@ The pitfalls below were identified in the course of getting the seven failing ar
 
 \paragraph{Always verify cosine similarity end-to-end.} Each rewritten model should be checked against the original PyTorch implementation on a fixed batch, requiring cosine similarity $\geq 0.999$ between embeddings before any latency claim is reported. Without this check, a manually decomposed normalization can silently shift the embedding distribution and the regression will only appear in downstream identification metrics. All three rewrites used here pass this check and produce \texttt{trtexec}-compilable engines under TensorRT~10.3 on SM~8.7.
 
-\paragraph{ONNX Runtime's TensorRT EP is a viable but slower fallback.} If a per-family rewrite is genuinely not feasible, the ONNX Runtime TensorRT Execution Provider will auto-partition the unrewritten ONNX graph and execute the unsupported sub-graphs on the CUDA EP. This works correctly but produces $1.5$--$2.5\times$ higher latencies than the rewritten native engines on the Jetson Orin Nano (e.g.\ ConvNeXt-T 4.53\,ms vs.\ 1.95\,ms FP16; MobileViT-v2-200 5.05\,ms vs.\ 1.90\,ms), because of sub-graph partitioning overhead and the unfused normalization fallback.
+\paragraph{ONNX Runtime's TensorRT EP is a viable but slower fallback.} If a per-family rewrite is genuinely not feasible, the ONNX Runtime TensorRT Execution Provider will auto-partition the unrewritten ONNX graph and execute the unsupported sub-graphs on the CUDA EP. This works correctly but produces $1.18$--$2.66\times$ higher latencies than the rewritten native engines on the Jetson Orin Nano (e.g.\ ConvNeXt-T 4.53\,ms vs.\ 1.95\,ms FP16; MobileViT-v2-200 5.05\,ms vs.\ 1.90\,ms), because of sub-graph partitioning overhead and the unfused normalization fallback.
 
 \paragraph{Unified Latency Results.}
-Table~\ref{tab:jetson-latency-full} reports the per-model FP32 and FP16 latencies of all sixteen architectures under the unified native-TRT harness on the Jetson Orin Nano in MAXN\_SUPER mode with \texttt{jetson\_clocks} locked. Each measurement is the mean of $2{,}000$ \texttt{trtexec} iterations after a $500$-iteration warm-up, with \texttt{--noDataTransfers --useCudaGraph} to isolate compute time. INT8 numbers in the same table are reported only for the nine originally TRT-compatible models, for which TRT's calibration-based PTQ pipeline was previously applied.
+Table~\ref{tab:jetson-latency-full} reports the per-model FP32 and FP16 latencies of all sixteen architectures under the unified native-TRT harness on the Jetson Orin Nano in MAXN\_SUPER mode with \texttt{jetson\_clocks} locked. Each measurement is the mean of $2{,}000$ \texttt{trtexec} iterations after a $500$\,ms warm-up, with \texttt{--noDataTransfers --useCudaGraph} to isolate compute time. This table contains FP32 and FP16 only; the separate power-mode sweep includes two native INT8 engines.
 
-\begin{table}[!tbp]
-\centering
-\caption{Unified native TensorRT inference latency on the Jetson Orin Nano (batch size 1, $96\times96$ input, MAXN\_SUPER, locked clocks). All sixteen baseline architectures execute as native TRT engines after applying the per-family rewrites of Section~\ref{sec:trt-compat-success} where required. INT8 uses TRT's built-in PTQ calibration and is reported only for the nine originally TRT-compatible models.}
-\label{tab:jetson-latency-full}
-\footnotesize
-\input{figures/jetson_unified_table.tex}
-\end{table}
+\paragraph{Cross-Family Latency Comparison.}
+Under the unified harness the family ordering at FP16 is, from fastest to slowest at the smallest size: ResNet-50d (1.19\,ms), DeiT3-S (1.34\,ms), Swin-T (1.67\,ms), MobileViT-v2-200 (1.90\,ms), DeiT3-M (1.92\,ms), ConvNeXt-T (1.95\,ms), PVT-v2-B2 (2.74\,ms). The previously observed $2.63\times$ gap between Swin-T and ConvNeXt-T (1.72\,ms vs.\ 4.53\,ms) shrinks to $1.17\times$ (1.67\,ms vs.\ 1.95\,ms) once the same backend executes both architectures; the residual gap is consistent with ConvNeXt's higher per-layer normalization count rather than a deployment artifact. Within the ConvNeXt family the FP16 ordering is ConvNeXt-T (1.95\,ms) $<$ ConvNeXt-S (3.35\,ms) $<$ ConvNeXt-B (4.73\,ms), tracking parameter count linearly; within PVT-v2 the spread is much wider---PVT-v2-B2 (2.74\,ms) $\to$ B3 (4.37\,ms) $\to$ B5 (7.19\,ms)---because of PVT-v2's deeper transformer blocks at the larger sizes. FP16 yields a $1.53$--$2.02\times$ speedup over FP32 across all sixteen architectures under unified TRT.
 
-Figure~\ref{fig:latency-comparison} visualizes the same data as paired FP32/FP16 bars grouped by architecture family, and Figure~\ref{fig:pareto} plots the FP16 latencies against TinyFace rank-1 accuracy.
+\paragraph{Pareto Analysis.}
+Figure~\ref{fig:pareto} combines the architecture-survey rank-1 rates with the uniform native-TensorRT FP16 latencies. Its non-dominated baseline points are ResNet-50d (1.19\,ms, 0.476), DeiT3-S (1.34\,ms, 0.552), Swin-T (1.67\,ms, 0.562), DeiT3-M (1.92\,ms, 0.570), and DeiT3-B (3.49\,ms, 0.583). Every other baseline is dominated by one of these points. MobileViT-v2-200 (1.90\,ms, 0.543), for example, is slower and less accurate than both DeiT3-S and Swin-T. PVT-v2-B5 (7.19\,ms, 0.547) takes about $2.06\times$ the latency of DeiT3-B at 0.036 lower rank-1. This figure describes the sixteen-model survey; it excludes the optimized KD and pruned configurations considered in the deployment guide.
 
-\begin{figure}[!tbp]
-    \centering
-    \includegraphics[width=\linewidth]{latency_comparison_unified.pdf}
-    \caption{Native TensorRT latency on the Jetson Orin Nano for all sixteen baseline models at FP32 (solid) and FP16 (light), batch size 1, $96\times96$ input, MAXN\_SUPER. Bars are colored by architecture family.}
-    \label{fig:latency-comparison}
-\end{figure}
-
-\begin{figure}[!tbp]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{accuracy_vs_latency_pareto_unified.pdf}
     \caption{TinyFace rank-1 accuracy vs.\ Jetson FP16 latency for all sixteen baselines under the unified native-TRT harness. The dashed line marks the Pareto front of non-dominated configurations.}
     \label{fig:pareto}
 \end{figure}
 
-\paragraph{Cross-Family Latency Comparison.}
-Under the unified harness the family ordering at FP16 is, from fastest to slowest at the smallest size: ResNet-50d (1.19\,ms), DeiT3-S (1.34\,ms), Swin-T (1.67\,ms), MobileViT-v2-200 (1.90\,ms), DeiT3-M (1.92\,ms), ConvNeXt-T (1.95\,ms), PVT-v2-B2 (2.74\,ms). The previously observed $4.8\times$ gap between Swin-T and ConvNeXt-T (1.72\,ms vs.\ 4.53\,ms) shrinks to $1.17\times$ (1.67\,ms vs.\ 1.95\,ms) once the same backend executes both architectures; the residual gap is consistent with ConvNeXt's higher per-layer normalization count rather than a deployment artifact. Within the ConvNeXt family the FP16 ordering is ConvNeXt-T (1.95\,ms) $<$ ConvNeXt-S (3.35\,ms) $<$ ConvNeXt-B (4.73\,ms), tracking parameter count linearly; within PVT-v2 the spread is much wider---PVT-v2-B2 (2.74\,ms) $\to$ B3 (4.37\,ms) $\to$ B5 (7.19\,ms)---because of PVT-v2's deeper transformer blocks at the larger sizes. FP16 yields a uniform $1.7$--$2.1\times$ speedup over FP32 across all sixteen architectures under unified TRT.
-
-\paragraph{Pareto Analysis.}
-Figure~\ref{fig:pareto} plots FP16 latency against TinyFace rank-1 accuracy under the unified native-TensorRT harness. The Pareto front is occupied almost exclusively by the DeiT-3 family, with two additional non-dominated points: ResNet-50d (1.19\,ms, 0.476) $\to$ DeiT3-S (1.34\,ms, 0.552) $\to$ Swin-T (1.67\,ms, 0.562) $\to$ DeiT3-M (1.92\,ms, 0.570) $\to$ DeiT3-B (3.49\,ms, 0.583). ResNet-50d anchors the front only at the lowest-accuracy extreme, and Swin-T slots between DeiT3-S and DeiT3-M by being slightly more accurate than DeiT3-S at slightly higher latency (and vice versa relative to DeiT3-M); the three DeiT-3 variants form the rest of the front as a clean accuracy--latency progression. Every other architecture is strictly dominated by a DeiT-3 variant: Swin-S/B and PVT-v2 trade higher latency for no accuracy advantage over DeiT3-M or DeiT3-B; ConvNeXt-T/S/B sit $0.03$--$0.05$ rank-1 below DeiT-3 at matched latency; and MobileViT-v2-200, despite being the most compact backbone (17.4\,M parameters) at 1.90\,ms, is dominated by both DeiT3-S (faster and more accurate) and Swin-T (slightly slower but $+0.019$ rank-1). PVT-v2-B5, at 7.19\,ms and 0.547 rank-1, is the worst point on the trade-off surface---roughly $2\times$ the latency of DeiT3-B for $0.036$ lower rank-1. The practical implication is that on this $96\times96$ task and on the Jetson Orin Nano, the DeiT-3 family (with Swin-T as a viable mid-range alternative) defines the entire accuracy--latency envelope; the columnar ViT architecture combined with timm's standard $(B,N,C)$ LayerNorm pattern simultaneously maximizes recognition accuracy and minimizes TensorRT overhead.
-
 \paragraph{Key Findings and Implications for Practitioners.}
 
 Not all vision backbones export to native TRT out of the box, but the gap is closable with principled graph rewrites. Models that apply layer normalization directly to NCHW spatial feature maps---rather than to flattened token sequences---fail standalone TRT 10.3 conversion on SM 8.7 because no kernel exists for that layout. The fix is not opset upgrades or operator decomposition (TRT's Myelin re-fuses both into the same unsupported ForeignNode), but module-level rewrites that present TRT with the supported $(B,N,C)$ \texttt{LayerNormalization} pattern while preserving numerical equivalence. ConvNeXt, PVT-v2 and MobileViT-v2---released in 2021--2022 and not specifically targeted at TRT 10.3---all fall in this category and all admit such rewrites.
 
-The specific failure mode is a ForeignNode with tactic ID 0. When \texttt{trtexec} reports \texttt{Could not find any implementation for node \{ForeignNode[\ldots]\}} together with a warning about tactic 0x0 being skipped due to insufficient memory, the root cause is almost always a missing hardware kernel rather than a memory budget issue, and increasing \texttt{--memPoolSize} will not resolve it.
+The specific failure mode is a ForeignNode with tactic ID 0. When \texttt{trtexec} reports \texttt{Could not find any implementation for node} \{\texttt{ForeignNode[\ldots]}\} together with a warning about tactic 0x0 being skipped due to insufficient memory, the root cause is almost always a missing hardware kernel rather than a memory budget issue, and increasing \texttt{--memPoolSize} will not resolve it.
 
-The ONNX Runtime TRT EP is a reasonable fallback when a per-family rewrite is not feasible, but it carries a measurable cost. The auto-partitioning EP achieves correct results without modifying the original ONNX graphs, at a $1.5$--$2.5\times$ latency penalty relative to the rewritten native engines on the Jetson Orin Nano (e.g.\ ConvNeXt-T 4.53\,ms vs.\ 1.95\,ms FP16, MobileViT-v2-200 5.05\,ms vs.\ 1.90\,ms). The penalty is attributable to sub-graph partitioning overhead and the unfused normalization fallback, both of which are eliminated by the rewritten engines.
+The ONNX Runtime TRT EP is a reasonable fallback when a per-family rewrite is not feasible, but it carries a measurable cost. The auto-partitioning EP achieves correct results without modifying the original ONNX graphs, at a $1.18$--$2.66\times$ latency penalty relative to the rewritten native engines on the Jetson Orin Nano (e.g.\ ConvNeXt-T 4.53\,ms vs.\ 1.95\,ms FP16, MobileViT-v2-200 5.05\,ms vs.\ 1.90\,ms). The penalty is attributable to sub-graph partitioning overhead and the unfused normalization fallback, both of which are eliminated by the rewritten engines.
 
 Validating numerical equivalence is essential. For all three rewrite families, a fixed test batch was passed through both the original PyTorch model and the exported ONNX (and, where possible, the built TRT engine), and a cosine similarity $\geq 0.999$ was required. Without this check, manually-decomposed normalization layers risk silent accuracy loss that would only surface in downstream identification metrics.
 
-FP16 precision provides a uniform $1.7$--$2.1\times$ speedup over FP32 across all sixteen architectures, so FP16 is a sensible default to benchmark for embedded deployment.
+FP16 precision provides a $1.53$--$2.02\times$ speedup over FP32 across all sixteen architectures, so FP16 is a sensible default to benchmark for embedded deployment.
 
-ONNX Runtime dynamic INT8 quantization is counterproductive on GPU for these architectures. We also benchmarked the pre-quantized INT8 ONNX models (exported via \texttt{quantize\_dynamic}) through the CUDA Execution Provider. The results were uniformly worse than FP32: ConvNeXt-T degrades from 5.98\,ms to 50.5\,ms and PVT-v2-B5 from 46.8\,ms to 306\,ms, an $8$--$15\times$ \emph{slowdown}. The single exception was MobileViT-v2-200 (19.3\,ms $\to$ 9.4\,ms speedup), attributable to its predominantly linear attention ops being weight-bandwidth-bound rather than activation-bound. The core issue is that \texttt{quantize\_dynamic} is a CPU optimisation: weights are stored as INT8 to reduce memory transfer bandwidth, but are dequantised to FP32 before execution. On GPU, where FP32 throughput is already high and the dequantize kernel adds latency, this is strictly worse than leaving weights in FP32. Genuine INT8 GPU acceleration requires operator-level INT8 tensor core execution, which is only available through TRT's native calibration-based PTQ (\texttt{trtexec --int8}). ONNX dynamic INT8 quantization should not be applied to models intended for GPU (CUDA EP or TRT EP) deployment.
+ONNX Runtime dynamic INT8 did not provide a consistent GPU speedup. In the saved CUDA-EP benchmark, six of seven architectures ran $6.54$--$13.90\times$ slower than FP32: ConvNeXt-T increased from 5.98\,ms to 50.5\,ms and PVT-v2-B5 from 46.8\,ms to 306\,ms. MobileViT-v2-200 was the exception (19.3\,ms to 9.4\,ms). These timings do not isolate the contribution of integer-operator placement, fallback, or conversion overhead. Dynamic INT8 file compression should therefore not be treated as evidence of GPU acceleration. Native TensorRT calibration-based INT8 is a separate deployment path whose accuracy and latency must be checked independently.
 
-\subsection{Per-Layer Bottleneck Analysis}
+\subsection{Per-Layer Bottleneck Analysis}\label{sec:layer-analysis}
 
 To understand where inference time is spent within each architecture, TensorRT profiling was conducted on 10 representative FP16 models on the Jetson Orin Nano using \texttt{trtexec --dumpProfile}. Each layer's execution time was categorized into five groups: self-attention (QKV projections and softmax), FFN and linear layers (including fused MLP and standalone matrix multiplications), normalization (layer norm), convolutional and embedding layers (patch embedding, patch merging, downsampling convolutions), and other operations (reformatting, activation, pooling). Figure~\ref{fig:layer-breakdown} presents the results as a stacked percentage breakdown with absolute latency annotated.
 
-\begin{figure}[!tbp]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{layer_breakdown.pdf}
     \caption{Per-layer time breakdown (FP16, Jetson Orin Nano) for DeiT-3, Swin, and ResNet models. Absolute latency is annotated above each bar. Self-attention (red) consumes a larger fraction in Swin models ($27$--$31\%$) than in DeiT-3 ($7$--$12\%$), while FFN and linear layers (blue) dominate DeiT-3 models ($68$--$83\%$).}
@@ -710,24 +747,25 @@ Comparing Swin-Tiny variants reveals that neither KD training nor block-level pr
 \subsection{Computational Profile across Resolutions}\label{sec:flops-profile}
 
 The wall-time profile in Section~\ref{sec:trt-compat} captures \emph{what TensorRT actually executes on the Jetson Orin Nano}, but it conflates arithmetic intensity, kernel fusion quality and memory traffic. To separate these effects from the underlying architectural cost, we additionally measured pure inference arithmetic for each of the 16 architecture/size combinations evaluated in this chapter. We use \texttt{fvcore.nn.FlopCountAnalysis} (Detectron2's tracer-based counter) and report the multiply--add count, i.e.\ \textbf{GMACs}, throughout this subsection. Reported numbers are therefore half the FLOP count under the convention $1\,\text{MAC} = 2\,\text{FLOPs}$; we use ``GMACs'' as the single nomenclature in all axes, captions, tables and CSV columns to avoid the FLOPs-vs-MACs ambiguity that pervades the literature. fvcore attributes GMACs only to named modules; the residual softmax / scaled-dot-product BMM in self-attention is not module-bound and is not included in the per-module breakdown---this is benign at the resolutions evaluated here (the attention BMM contributes $<1\%$ of total at $96\times96$ for DeiT-3 with 36 tokens) but would dominate above $\sim$$512\times512$.
-The sweep covers a power-of-two-ish resolution ladder $\{64, 96, 128, 160, 224, 256, 384, 512, 768, 1024\}$ for every family. timm's Swin v1 implementation pads the input internally so that the windowed attention partition is well-defined at any resolution; we therefore use the same ladder for it as for the other families. All measurements are taken at batch=1 with PyTorch eager mode on a workstation GPU (FP32) using \texttt{timm.create\_model(num\_classes=0)}, which strips the classification head so that the cost reflects the backbone alone. Reference checks against published numbers all match within rounding: DeiT3-S at $224\times224 = 4.25$\,GMACs, ResNet-50d $= 4.35$\,GMACs, Swin-T $= 4.51$\,GMACs.
+The sweep covers a power-of-two-ish resolution ladder $\{64, 96, 128, 160, 224, 256, 384, 512, 768, 1024\}$ for every family. timm's Swin v1 implementation pads the input internally so that the windowed attention partition is well-defined at any resolution; we therefore use the same ladder for it as for the other families. All measurements are taken at batch=1 with PyTorch eager mode on a workstation GPU (FP32) using \texttt{timm.create\_model(num\_classes=0)}, which strips the classification head so that the cost reflects the backbone alone.
 
-Figure~\ref{fig:flops-vs-resolution} plots total GMACs against input resolution as a six-panel small-multiples view (one panel per architecture family, linear axes, shared y-range so cost can be compared directly across families). Two structural observations stand out. First, every family produces a clearly super-linear curve in resolution: GMACs grow roughly as $H^2$ because the dominant compute terms (FFN per token, $1\times1$ convolutions per pixel, $3\times3$ convolutions per pixel) all scale with the spatial token count, which itself is $O(H^2)$. Equivalently, on a pixel-axis the same data fits a slope $\approx 1.0$ within the swept range ($0.99$--$1.03$ across the six representatives), confirming the GMACs-linear-in-pixels regime. Second, neither global self-attention (DeiT-3) nor windowed attention (Swin) bends visibly above the per-family parabola within $[64, 1024]$\,px: the often-cited quadratic-in-tokens cost of global attention only becomes the dominant term well above the resolutions evaluated here, so model selection at $96\times96$ or $224\times224$ should not be driven by an asymptotic argument that is not yet active. The shared y-range also makes inter-family magnitude comparisons immediate: at $1024\times1024$ DeiT3-B and ConvNeXt-B trace nearly identical curves topping out at $\sim$$350$\,GMACs, ResNet-200d and Swin-B sit just below them ($\sim$$320$\,GMACs and $\sim$$340$\,GMACs), and MobileViTv2-200 occupies a different cost class entirely (peaking at $\sim$$115$\,GMACs).
+Figure~\ref{fig:flops-vs-resolution} plots total GMACs against input resolution as a six-panel small-multiples view (one panel per architecture family, linear axes, shared y-range so cost can be compared directly across families).
 
-\begin{figure}[!tbp]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=\linewidth]{flops_vs_resolution.pdf}
     \caption{Inference cost (GMACs, batch=1, FP32) versus input resolution for all 16 chapter architectures, grouped into per-family panels with a shared y-axis so that cost can be compared directly across families. Linear axes are used so that the super-linear ($\approx H^2$) growth is visible directly as a parabola; per-family panels prevent the four mid-size families from collapsing onto a single curve at the deployment resolutions. Counter: \texttt{fvcore.nn.FlopCountAnalysis}.}
     \label{fig:flops-vs-resolution}
 \end{figure}
 
-Figure~\ref{fig:flops-breakdown-96} shows the per-module breakdown at the chapter's deployment resolution of $96\times96$, with absolute GMACs annotated at the right edge of each bar. Three architectural patterns emerge that cleanly explain---and in some cases contradict---the latency profile measured on the Jetson:
+Two structural observations stand out. First, every family produces a clearly super-linear curve in resolution: GMACs grow roughly as $H^2$ because the dominant compute terms (FFN per token, $1\times1$ convolutions per pixel, $3\times3$ convolutions per pixel) all scale with the spatial token count, which itself is $O(H^2)$. Equivalently, on a pixel-axis the same data fits a slope $\approx 1.0$ within the swept range ($0.99$--$1.03$ across the six representatives), confirming the GMACs-linear-in-pixels regime. Second, neither global self-attention (DeiT-3) nor windowed attention (Swin) bends visibly above the per-family parabola within $[64, 1024]$\,px: the often-cited quadratic-in-tokens cost of global attention only becomes the dominant term well above the resolutions evaluated here, so model selection at $96\times96$ or $224\times224$ should not be driven by an asymptotic argument that is not yet active. The shared y-range also makes inter-family magnitude comparisons immediate: at $1024\times1024$ DeiT3-B and ConvNeXt-B trace nearly identical curves topping out at $\sim$$350$\,GMACs, ResNet-200d and Swin-B sit just below them ($\sim$$320$\,GMACs and $\sim$$340$\,GMACs), and MobileViTv2-200 occupies a different cost class entirely (peaking at $\sim$$115$\,GMACs).
+
+Three architectural patterns emerge that cleanly explain---and in some cases contradict---the latency profile measured on the Jetson:
 
 \paragraph{DeiT-3 and Swin are FFN-bound at $96\times96$.}
 For all six DeiT-3 / Swin variants the FFN consumes $59$--$66\%$ of inference GMACs and the QKV $+$ output projections together consume an additional $30$--$33\%$. The dot-product attention itself is invisible at this resolution (DeiT-3 has only $36$ tokens, Swin partitions into $7\times7=49$-token windows). This is exactly the GMACs analogue of the wall-time finding from Section~\ref{sec:trt-compat} that DeiT-3 spends $68$--$83\%$ of its time in fused FFN/linear kernels. The agreement is not trivial: it confirms that on DeiT-3 the kernel fusion is good enough that GMACs share and time share track each other, which is why FFN quantization and head pruning work as expected. The Swin numbers also agree: Swin spends a higher latency fraction in the attention kernel ($27$--$31\%$) than its GMACs share would suggest ($\sim$$33\%$ for QKV+proj), because the window-partition / window-reverse memory shuffles around windowed attention add wall-time without adding GMACs.
 
-\paragraph{ConvNeXt is dominated by $1\times1$ pointwise convolutions, not by depthwise.}
-The timm ConvNeXt implementation expresses the inverted-bottleneck $1\times1$ convolutions as \texttt{nn.Linear} layers under \texttt{block.mlp.fc1} and \texttt{block.mlp.fc2}, so they are bucketed as \emph{FFN/MLP} in Figure~\ref{fig:flops-breakdown-96}. Under that bookkeeping the ``MLP'' segment contributes $93$--$96\%$ of ConvNeXt's GMACs and the named \texttt{conv\_dw} depthwise $7\times7$ contributes only $1$--$2\%$. Translated back to the convolutional view, the inverted bottleneck (which is just the $1\times1$ projection up to $4\times$ width and back) accounts for almost the entire GMACs budget and the $7\times7$ depthwise is a near-free spatial mixer. The $96\times96$ GMACs cost is modest ($0.82$\,GMACs for ConvNeXt-T), and after the per-family graph rewrite documented in Section~\ref{sec:trt-compat} the resulting native TRT engine runs at $1.95$\,ms FP16 on the Jetson Orin Nano---in the same band as DeiT3-M ($1.92$\,ms) and only $17\%$ behind the comparably sized Swin-T ($1.67$\,ms). The earlier wall-time penalty often attributed to the un-fused \texttt{Transpose$\to$LayerNorm$\to$Transpose} pattern was a property of the unrewritten ONNX graph (and of ONNX Runtime TRT EP, which falls back to the CUDA EP for that subgraph), not an inherent architectural cost of ConvNeXt itself.
+Figure~\ref{fig:flops-breakdown-96} shows the per-module breakdown at the chapter's deployment resolution of $96\times96$, with absolute GMACs annotated at the right edge of each bar.
 
 \begin{figure}[!htbp]
     \centering
@@ -736,8 +774,16 @@ The timm ConvNeXt implementation expresses the inverted-bottleneck $1\times1$ co
     \label{fig:flops-breakdown-96}
 \end{figure}
 
+\paragraph{ConvNeXt is dominated by $1\times1$ pointwise convolutions, not by depthwise.}
+The timm ConvNeXt implementation expresses the inverted-bottleneck $1\times1$ convolutions as \texttt{nn.Linear} layers under \texttt{block.mlp.fc1} and \texttt{block.mlp.fc2}, so they are bucketed as \emph{FFN/MLP} in Figure~\ref{fig:flops-breakdown-96}. Under that bookkeeping the ``MLP'' segment contributes $93$--$96\%$ of ConvNeXt's GMACs and the named \texttt{conv\_dw} depthwise $7\times7$ contributes only $1$--$2\%$. Translated back to the convolutional view, the inverted bottleneck (which is just the $1\times1$ projection up to $4\times$ width and back) accounts for almost the entire GMACs budget and the $7\times7$ depthwise is a near-free spatial mixer. The $96\times96$ GMACs cost is modest ($0.82$\,GMACs for ConvNeXt-T), and after the per-family graph rewrite documented in Section~\ref{sec:trt-compat} the resulting native TRT engine runs at $1.95$\,ms FP16 on the Jetson Orin Nano---in the same band as DeiT3-M ($1.92$\,ms) and only $17\%$ behind the comparably sized Swin-T ($1.67$\,ms). The earlier wall-time penalty often attributed to the un-fused \texttt{Transpose$\to$LayerNorm$\to$Transpose} pattern was a property of the unrewritten ONNX graph (and of ONNX Runtime TRT EP, which falls back to the CUDA EP for that subgraph), not an inherent architectural cost of ConvNeXt itself.
+
 \paragraph{PVT v2 and MobileViT v2 are hybrid.}
 PVT v2's spatial-reduction attention partly suppresses the QKV cost at deep stages, so the family still spends $68$--$72\%$ of GMACs on the FFN but only $\sim$$10$--$13\%$ on QKV (vs.\ $\sim$$25\%$ for DeiT-3 and Swin); the spatial-reduction $1\times1$/strided convs end up in the \emph{Attn other} category and account for a non-trivial $\sim$$5\%$. MobileViT v2 is the most distinctive of the 16: convolutional layers (the MobileNet-v2-like stem and the depthwise/pointwise mobile blocks) account for $60\%$ of total GMACs, with separable transformer blocks splitting the remainder between FFN ($20\%$) and the linear projections inside the separable attention ($15\%$). This dual-budget profile is the architectural reason MobileViT v2 places so differently on the Pareto curve from both pure CNNs and pure transformers.
+
+\paragraph{ResNet is conv-bound, as expected.}
+ResNet-D variants spend $91$--$97\%$ of GMACs in the bottleneck convolutions, with the strided $1\times1$ downsample shortcuts contributing the small remainder. The conv share \emph{rises} with depth (50d $\to$ 200d) because the additional bottleneck stages add convolutions without adding downsample shortcuts. This matches the wall-time profile ($98$--$99\%$ in conv kernels) almost exactly; ResNet-D is the family for which fvcore-measured GMACs are the cleanest predictor of measured Jetson latency.
+
+Table~\ref{tab:flops-top-modules-96} consolidates the top-3 contributing categories per model at $96\times96$. Because every family in this regime scales linearly with pixels, the percentage shares per category at the canonical $224\times224$ pretraining resolution differ by less than $\sim$$5$\,pp from the $96\times96$ values; the absolute GMACs simply scale by approximately the pixel ratio $(224/96)^2 \approx 5.4\times$.
 
 \begin{table}[!htbp]
     \centering
@@ -747,11 +793,6 @@ PVT v2's spatial-reduction attention partly suppresses the QKV cost at deep stag
     \input{figures/flops_top_modules_table.tex}
 \end{table}
 
-\paragraph{ResNet is conv-bound, as expected.}
-ResNet-D variants spend $91$--$97\%$ of GMACs in the bottleneck convolutions, with the strided $1\times1$ downsample shortcuts contributing the small remainder. The conv share \emph{rises} with depth (50d $\to$ 200d) because the additional bottleneck stages add convolutions without adding downsample shortcuts. This matches the wall-time profile ($98$--$99\%$ in conv kernels) almost exactly; ResNet-D is the family for which fvcore-measured GMACs are the cleanest predictor of measured Jetson latency.
-
-Table~\ref{tab:flops-top-modules-96} consolidates the top-3 contributing categories per model at $96\times96$. Because every family in this regime scales linearly with pixels, the percentage shares per category at the canonical $224\times224$ pretraining resolution differ by less than $\sim$$5$\,pp from the $96\times96$ values; the absolute GMACs simply scale by approximately the pixel ratio $(224/96)^2 \approx 5.4\times$.
-
 The cross-reference between this GMACs view and the wall-time view of Section~\ref{sec:trt-compat} is the real takeaway. Where the two agree (DeiT-3, ResNet-D, ConvNeXt under the rewritten native-TRT engines), the architecture's compute is well-fused and GMACs are a usable latency proxy. Where they disagree (Swin spends more wall-time fraction in attention than its GMACs fraction would suggest because of the window-partition shuffles), the discrepancy points directly at a deployment-time inefficiency that is not visible in any pure architectural metric. For embedded deployment the practical implication is that \emph{model selection from a published GMACs table is unsafe whenever the target device or runtime cannot fuse the architecture's idiosyncratic non-GMACs operators}---a category that includes essentially every modern ConvNet--Transformer hybrid on TensorRT 10.x for SM~8.7.
 
 \subsection{Summary and Implications for Embedded Deployment}
@@ -760,7 +801,7 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
 
 \begin{table}[!htbp]
     \centering
-    \caption{Overall best results across all experiments. For each architecture, the best pruning+quantization configuration is shown alongside the unpruned baseline. The highest absolute student accuracy is Swin-T + KD ($\alpha{=}0.0$) at 0.616 rank-1; the smallest competitive model is DeiT3-S at 10\% heads, INT8 (21.7\,MB).}
+    \caption{Selected training and pruning+quantization results alongside their unpruned sources. Sizes are ONNX file sizes, not runtime memory. The highest absolute student accuracy is Swin-T + KD ($\alpha{=}0.0$) at 0.616 rank-1; the smallest competitive model is DeiT3-S at 10\% heads, INT8 (21.7\,MB).}
     \label{tab:overall-summary}
     \footnotesize
     \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c}
@@ -783,7 +824,7 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
         DeiT3-S    & 10\% heads, INT8 & 20.9\,M & 21.7\,MB & \textbf{0.565} & 0.619 \\
         Swin-B     & 5 blocks, INT8   & 71.0\,M & 71.2\,MB & 0.554 & 0.612 \\
         DeiT3-B KD ($\alpha{=}0.1$) & 10\% heads, INT8 & 82.9\,M & 82.0\,MB & 0.591 & 0.645 \\
-        DeiT3-B LoRA & 10\% heads, INT8 & 84.7\,M & 82.0\,MB & 0.586 & 0.640 \\
+        DeiT3-B Baseline & 10\% heads, INT8 & 84.7\,M & 82.0\,MB & 0.586 & 0.640 \\
         \midrule
         ResNet-50 & Baseline                        & 23.5\,M & --- & 0.476 & 0.542 \\
         \bottomrule
@@ -793,39 +834,39 @@ Table~\ref{tab:overall-summary} consolidates the best results across all experim
 The experimental findings carry several implications for embedded vision transformer deployment:
 
 \begin{enumerate}
-    \item \textbf{Compact transformers outperform large CNNs on low-resolution inputs.} Swin-Tiny (27.5M) outperforms ResNet-200 (62.6M) by $+$0.066 rank-1 in the baseline setting, and by $+$0.148 with optimized KD. On TinyFace, where input resolution is severely limited, transformers offer a favorable accuracy--efficiency trade-off. Self-attention's global receptive field is a likely source of this advantage, since it lets the model exploit limited spatial information more effectively than local convolutions; the relative benefit may differ on higher-resolution or non-biometric tasks.
+    \item \textbf{Compact transformers suit low-resolution inputs.} Swin-Tiny (27.5M) outperforms ResNet-200 (62.6M) by $+$0.066 rank-1 in the baseline setting, and by $+$0.148 with optimized KD. On TinyFace, where input resolution is severely limited, transformers offer a favorable accuracy--efficiency trade-off. Self-attention's global receptive field is a likely source of this advantage, since it lets the model exploit limited spatial information more effectively than local convolutions; the relative benefit may differ on higher-resolution or non-biometric tasks.
 
-    \item \textbf{LoRA effectiveness is architecture-dependent.} On TinyFace, LoRA improved all Swin (hierarchical, local-window attention) variants and degraded all DeiT-3 (columnar, global attention) variants. Swin's hierarchical structure may benefit from the regularizing effect of LoRA's low-rank constraint, whereas DeiT-3's global attention layers seem to require higher-rank updates to adapt to this domain. The implication is that PET methods should be evaluated per architecture rather than applied uniformly, and that the LoRA--architecture interaction warrants further study across other tasks and datasets.
+    \item \textbf{LoRA with progressive unfreezing has architecture-dependent outcomes.} On TinyFace, this hybrid improved all Swin variants and degraded all DeiT-3 variants relative to their no-adapter progressive-unfreezing baselines. The schedules ultimately trained approximately 96--98\% of original Swin backbone parameters and 66\% of original DeiT-3 parameters, although selected checkpoints can come from earlier epochs. Standard frozen-backbone LoRA was also completed in the preliminary sweeps; its EVAL metrics are distinct from these test-set results. A common-split comparison with matched hyperparameters is needed to separate the contributions of adapters, unfreezing, and architecture.
 
     \item \textbf{Knowledge distillation requires careful tuning of the loss mixing coefficient.} The commonly used $\alpha = 0.7$ leaves significant accuracy on the table. With proper tuning, KD boosts Swin-Tiny from 0.534 (baseline) to 0.616 (a 15.4\% relative improvement), making it competitive with models three times its size.
 
     \item \textbf{Teacher accuracy on the target task interacts non-trivially with the mixing coefficient.} The higher-accuracy CVLFace teacher enabled pure feature distillation ($\alpha = 0.0$), while the lower-accuracy frozen PETALface teacher required hard-loss anchoring ($\alpha \geq 0.1$) to prevent training collapse. KD configurations should be validated end-to-end rather than relying on teacher accuracy as a proxy for student improvement, and the optimal $\alpha$ should be re-tuned when changing teachers or target datasets.
 
-    \item \textbf{Post-training quantization is essentially free.} Across all models tested, FP16 conversion was lossless and INT8 dynamic quantization introduced at most 0.002 absolute rank-1 loss while reducing model size by $3.8$--$3.9\times$. For deployment on integer-only accelerators (NPUs, DSPs), INT8 quantization should be a default step rather than a trade-off.
+    \item \textbf{Quantization offers substantial file-size savings with small accuracy changes.} The four unpruned examples lose at most 0.0016 rank-1 under dynamic INT8, with $3.8$--$3.9\times$ smaller files. Across 24 pruned models, the maximum additional INT8 loss is 0.0099; FP16 changes rank-1 by at most 0.0008. Native TensorRT FP16 is the measured GPU default here. Dynamic INT8 storage and native GPU INT8 acceleration require separate validation.
 
     \item \textbf{Structured pruning is architecture- and strategy-dependent.} Block dropping improved both Swin variants (Swin-T $+$0.010, Swin-B $+$0.028 rank-1 from baseline) and was the only safe pruning method for KD-distilled Swin-T, while head pruning degraded Swin at every ratio tested. For DeiT3 models, conservative head pruning (10\%) improved DeiT3-S ($+$0.013 rank-1) and preserved DeiT3-B KD accuracy (0.591 $\approx$ 0.593). The pruning axis (depth vs.\ width) needs to be matched to both the architecture and the training regime, and automated pruning search may unlock further gains.
 
     \item \textbf{KD and pruning interact in non-obvious ways.} The strongest KD checkpoint (Swin-T, $\alpha{=}0.0$, rank-1 = 0.616) suffers catastrophic degradation under head pruning ($-$0.213 at 10\%) even though the same pruning is benign on the weaker baseline (0.534 $\to$ 0.500). Distillation with $\alpha{=}0.0$ (pure feature matching) appears to concentrate knowledge into fewer heads, which makes the model fragile under head removal. Practitioners planning to combine KD with pruning should either use moderate $\alpha$ values or prefer block dropping to preserve distilled representations.
 
-    \item \textbf{Pruning and quantization compose without compounding losses.} INT8 quantization of pruned models induced the same $\sim$0.000--0.003 rank-1 change as on unpruned models, so both compression techniques can be applied sequentially. The combination of pruning$+$INT8 achieves $3.8$--$5.1\times$ compression while maintaining or improving accuracy in several configurations.
+    \item \textbf{Pruning and quantization can be combined, with checkpoint-specific accuracy checks.} The median absolute INT8 change across pruned models is 0.0013, but the largest drop is 0.0099. Selected pruning$+$INT8 configurations achieve $3.8$--$5.1\times$ file-size compression while maintaining or improving rank-1 over their unpruned FP32 sources; this is not a guarantee for every pruning setting.
 \end{enumerate}
 
 \subsection{Power-Mode Trade-offs}\label{sec:power-modes}
 
 All latency numbers reported above were measured under the Jetson Orin Nano's \texttt{MAXN\_SUPER} power mode, which removes the on-board wattage cap. Practical embedded deployments, however, often run under a tighter thermal or battery budget. To quantify how the previously reported throughput scales when this budget is reduced, we re-benchmarked a representative subset of fourteen (model, precision) configurations across the three power modes exposed by \texttt{nvpmodel} on the Orin Nano ``Super'' firmware (R36.4.3): \textbf{15W} (ID 0), \textbf{25W} (ID 1) and \textbf{MAXN\_SUPER} (ID 2). Between modes we issued \texttt{nvpmodel -m <id>} followed by \texttt{jetson\_clocks} and a five-second settling sleep so that DVFS, fan and voltage rails reached steady state before the timing window opened; all other \texttt{trtexec} arguments (workspace, warmup, iterations, CUDA-graph capture, batch size) were held identical so that the only varying factor is the runtime power cap. All fourteen configurations---including ConvNeXt-T and PVTv2-B2, which were re-exported using the per-family rewrites of Section~\ref{sec:trt-compat-success}---were benchmarked through the same unified native-TRT harness.
 
-Sustained wall power was captured per mode with \texttt{tegrastats --interval 500} and parsed for the \texttt{VDD\_IN} rail. The measured averages diverge meaningfully from the configured budgets: the 15W mode draws $7.6$\,W mean / $13.0$\,W p95, the 25W mode draws $12.4$\,W mean / $15.0$\,W p95, and \texttt{MAXN\_SUPER} draws $13.5$\,W mean / $16.0$\,W p95. Notably, \texttt{MAXN\_SUPER} only adds about $1$\,W of sustained draw over the 25W cap while still producing the headline throughput. Under a single-stream batch=1 workload at $96\times96$ the Orin Nano never approaches the theoretical 25\,W envelope, so removing the cap is essentially free in this regime.
-Table~\ref{tab:power-modes} reports mean latency, throughput and the relative 15W slowdown for each model; Figure~\ref{fig:power-mode-latency} visualises the latency bars and Figure~\ref{fig:power-mode-throughput-per-watt} normalises throughput by the \emph{configured} budget so that the 15W mode is given credit for its lower power envelope.
+Input-rail power was sampled throughout each mode sweep with \texttt{tegrastats --interval 500} and parsed for the \texttt{VDD\_IN} rail. These pooled measurements cover the full model sweep rather than an individual model: the 15W mode draws $7.6$\,W mean / $13.0$\,W p95, the 25W mode draws $12.4$\,W mean / $15.0$\,W p95, and \texttt{MAXN\_SUPER} draws $13.5$\,W mean / $16.0$\,W p95. The pooled mean rises by about $1.1$\,W from 25W to \texttt{MAXN\_SUPER}. These workload-specific means and p95 values do not establish a per-model maximum draw or a guaranteed thermal envelope.
+Table~\ref{tab:power-modes} reports mean latency, throughput and the relative 15W slowdown for each model.
 
-\begin{table}[!tbp]
+\begin{table}[!htbp]
     \centering
-    \caption{Latency, throughput and 15W slowdown across the three Jetson Orin Nano power modes for the 14-model representative subset (batch=1, $96\times96$). All engines benchmarked under the unified native TensorRT harness (\texttt{trtexec --useCudaGraph}); ConvNeXt-T and PVTv2-B2 use the rewritten engines described in Section~\ref{sec:trt-compat-success}. \textit{Slowdown} is the 15W mean latency divided by the \texttt{MAXN\_SUPER} mean latency; \textit{FPS CV} is the coefficient of variation of throughput across the three modes (lower = more power-mode-stable).}
+    \caption{Latency, throughput and 15W slowdown across the three Jetson Orin Nano power modes for the 14-model representative subset (batch=1, $96\times96$). The KD $\alpha{=}0.1$ row uses the frozen PETALface teacher, distinct from the best CVLFace-trained checkpoint. The head-pruned DeiT3-B row uses the baseline source identified in Section~\ref{sec:pruning-setup}. All engines use the unified native TensorRT harness (\texttt{trtexec --useCudaGraph}); ConvNeXt-T and PVTv2-B2 use the rewritten engines described in Section~\ref{sec:trt-compat-success}. \textit{Slowdown} is the 15W mean latency divided by the \texttt{MAXN\_SUPER} mean latency; \textit{FPS CV} is the coefficient of variation of throughput across the three modes (lower = more power-mode-stable).}
     \label{tab:power-modes}
     \scriptsize
     \setlength{\tabcolsep}{3pt}
     % Column-width budget (must sum to 10 = number of X columns):
-    %   Model 2.4  | Prec 0.6  | 6 numeric @ 0.80  | 15W slow. 1.1  | FPS CV 1.1
-    %   = 2.4 + 0.6 + 4.8 + 1.1 + 1.1 = 10.0
+    %   Model 2.6  | Prec 0.6  | 6 numeric @ 0.80  | 15W slow. 1.0  | FPS CV 1.0
+    %   = 2.6 + 0.6 + 4.8 + 1.0 + 1.0 = 10.0
     \begin{tabularx}{\linewidth}{%
         >{\raggedright\arraybackslash\hsize=2.6\hsize}X%
         >{\centering\arraybackslash\hsize=0.6\hsize}X%
@@ -848,80 +889,75 @@ Table~\ref{tab:power-modes} reports mean latency, throughput and the relative 15
         swin\_tiny                        & int8 & 2.13 & 1.72 & 1.66 & 469 & 579 & 602 & $1.28\times$ & 0.129 \\
         swin\_tiny\_KD\_$\alpha{=}0$      & fp16 & 2.15 & 1.72 & 1.66 & 464 & 581 & 602 & $1.30\times$ & 0.135 \\
         deit3\_base\_KD\_$\alpha{=}0.1$   & fp16 & 4.16 & 3.52 & 3.47 & 240 & 284 & 288 & $1.20\times$ & 0.097 \\
-        deit3\_base\_LoRA-heads-10\%      & fp16 & 4.06 & 3.45 & 3.39 & 246 & 289 & 295 & $1.20\times$ & 0.096 \\
+        DeiT3-B, 10\% heads               & fp16 & 4.06 & 3.45 & 3.39 & 246 & 289 & 295 & $1.20\times$ & 0.096 \\
         swin\_tiny\_KD-blocks-2           & fp16 & 1.87 & 1.50 & 1.44 & 534 & 666 & 693 & $1.30\times$ & 0.135 \\
         \midrule
-        \multicolumn{10}{@{}l}{\textit{Native TRT engines for the previously TRT-incompatible architectures (re-exported via the per-family rewrites of Section~\ref{sec:trt-compat-success}):}} \\
+        \multicolumn{10}{@{}p{\linewidth}@{}}{\textit{Previously incompatible models, using the rewrites of Section~\ref{sec:trt-compat-success}:}} \\
         convnext\_tiny                    & fp16 & 2.60 & 2.04 & 1.95 & 385 & 490 & 512 & $1.33\times$ & 0.147 \\
         pvt\_v2\_b2                       & fp16 & 3.84 & 2.91 & 2.74 & 260 & 343 & 365 & $1.40\times$ & 0.171 \\
         \midrule
-        \multicolumn{10}{@{}l}{\textit{Sustained \texttt{VDD\_IN} wall power per mode (\texttt{tegrastats}, mean / p95):}} \\
+        \multicolumn{10}{@{}l}{\textit{Pooled \texttt{VDD\_IN} input-rail power per mode (\texttt{tegrastats}, mean / p95):}} \\
         \multicolumn{10}{@{}l}{15W: $7.61$\,W / $13.03$\,W \quad 25W: $12.36$\,W / $15.04$\,W \quad MAXN\_SUPER: $13.46$\,W / $15.97$\,W} \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-\begin{figure}[!tbp]
-    \centering
-    \includegraphics[width=\linewidth]{figures/power_mode_latency.pdf}
-    \caption{Mean inference latency (ms, batch=1, $96\times96$) for the 14-model representative subset across the three Jetson Orin Nano power modes, all under the unified native TRT harness. The 15W mode adds a uniform $20$--$40\%$ latency penalty over \texttt{MAXN\_SUPER}; 25W is within $2$--$6\%$ of \texttt{MAXN\_SUPER} for every model, mirroring the modest $\sim$1\,W difference observed via \texttt{tegrastats}.}
-    \label{fig:power-mode-latency}
-\end{figure}
-
-\begin{figure}[!tbp]
-    \centering
-    \includegraphics[width=\linewidth]{figures/power_mode_throughput_per_watt.pdf}
-    \caption{Throughput normalised by the \emph{configured} \texttt{nvpmodel} budget (15, 25 or 25\,W). On a per-watt basis, the 15W mode is competitive with or wins against \texttt{MAXN\_SUPER} for every workload, despite delivering lower absolute FPS.}
-    \label{fig:power-mode-throughput-per-watt}
-\end{figure}
-
 \paragraph{Discussion.} The sweep results break down into three patterns:
 
 \begin{itemize}
-    \item \textbf{Graceful degradation under 15W.} The throughput coefficient of variation across the three modes (\textit{FPS CV} column in Table~\ref{tab:power-modes}) stays in a narrow $0.10$--$0.15$ band: no model ``collapses'' under the 15W cap. The smallest variance ($\sim$0.10) is observed for the DeiT3-B family (DeiT3-B baseline, KD~$\alpha{=}0.1$ and LoRA-pruned), making them the most ``power-mode-stable'' configurations in the suite. This is consistent with the per-layer profiling of Section~5.4: DeiT3-B's runtime is dominated by FFN GEMMs that already saturate the GPU SMs at the 15W clock cap, leaving little additional throughput to extract at higher clocks.
+    \item \textbf{Graceful degradation under 15W.} The throughput coefficient of variation across the three modes (\textit{FPS CV} column in Table~\ref{tab:power-modes}) stays in a narrow $0.096$--$0.171$ range: no model ``collapses'' under the 15W cap. The smallest variance ($\sim$0.10) is observed for the DeiT3-B family (DeiT3-B baseline, KD~$\alpha{=}0.1$ and head-pruned baseline), making them the most ``power-mode-stable'' configurations in the suite. This is consistent with the per-layer profiling of Section~\ref{sec:layer-analysis}: DeiT3-B's runtime is dominated by FFN GEMMs that already saturate the GPU SMs at the 15W clock cap, leaving little additional throughput to extract at higher clocks.
     \item \textbf{Lightweight workloads scale most aggressively with the budget.} The largest 15W slowdowns are seen on PVTv2-B2 ($1.40\times$), ConvNeXt-T ($1.33\times$), DeiT3-S ($1.32\times$), Swin-T-KD-blocks~2 ($1.30\times$) and Swin-T-KD~$\alpha{=}0$ ($1.30\times$): exactly the models whose per-iteration kernels are short enough to be limited by GPU clock rather than by SM occupancy. PVTv2-B2's especially clock-sensitive behaviour is consistent with its layer-norm-heavy graph, even after the rewrite to native TRT.
-    \item \textbf{Configured budget vs.\ measured wall power.} The configured 15W cap delivers a measured $7.6$\,W mean / $13.0$\,W p95, i.e.~roughly half the nameplate value, because the workload never simultaneously stresses all six A78 cores and the GPU. Conversely, \texttt{MAXN\_SUPER} only draws $\sim$1\,W more than the 25W mode but yields a $2$--$5\%$ throughput uplift; outside of strictly thermally constrained enclosures, leaving the device in \texttt{MAXN\_SUPER} is the correct default. The discrepancy between the \texttt{nvpmodel} label and the measured \texttt{VDD\_IN} draw is a reminder that the configured budget is an upper bound, not an estimate of actual consumption.
+    \item \textbf{Configured budget and measured draw differ.} The 15W setting gives a pooled mean of $7.6$\,W and p95 of $13.0$\,W for this sweep. The 25W setting retains $94$--$98\%$ of \texttt{MAXN\_SUPER} throughput across the fourteen configurations at about $1.1$\,W lower pooled mean draw. The mode label alone therefore cannot predict application power consumption.
 \end{itemize}
 
-\paragraph{Deployment recommendation per power budget.} For a sustained $\le$10\,W battery-class envelope, the 15W \texttt{nvpmodel} setting paired with Swin-T-KD-blocks~2 (FP16) delivers $533$\,FPS at $1.87$\,ms while staying inside a $7.6$\,W mean draw---the best accuracy/latency/power combination in the table. For a 15--20\,W passively-cooled envelope, the 25W mode captures $96$--$98\%$ of \texttt{MAXN\_SUPER}'s throughput at $\sim$1\,W lower sustained draw and is the recommended default. For actively-cooled or wall-powered deployments, \texttt{MAXN\_SUPER} should be used because its $1$\,W premium over 25W mode is well below the noise floor of the platform's power supply.
+\paragraph{Deployment recommendation per power budget.} The 15W setting is a useful candidate when power is constrained: Swin-T KD with two blocks removed runs at $1.87$\,ms (534\,FPS), versus $2.15$\,ms (464\,FPS) for the higher-accuracy unpruned KD model. The pooled $7.6$\,W mean cannot establish that either model meets a strict 10\,W ceiling, especially with a pooled p95 of $13.0$\,W. The 25W setting retains most measured throughput with lower pooled draw; \texttt{MAXN\_SUPER} gives the highest throughput in this sweep. Select among them using the application's latency, peak-power, and thermal measurements.
 
 \paragraph{Deployment Decision Guide.}
-Table~\ref{tab:deployment-guide} summarises the experimental results as a set of concrete recommendations organised by deployment priority. The recommendations are specific to the TinyFace task ($96\times96$ input, face identification) on the Jetson Orin Nano; deployments on other tasks, input resolutions, or hardware should be validated empirically.
+Table~\ref{tab:deployment-guide} presents a fresh comparison of selected configurations using accuracy measured directly in TensorRT, native GPU latency, and measured runtime resources.
 
-\begin{table}[!tbp]
+\begingroup
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\begin{table}[!htbp]
     \centering
-    \caption{Recommended model configurations for common embedded deployment scenarios, based on the experimental results from this study. All latency figures are FP16 on the Jetson Orin Nano at batch size~1. INT8 sizes assume ONNX dynamic quantization.}
+    \caption{Native TensorRT in a separate MAXN\_SUPER session (batch 1, $96\times96$, locked CPU/GPU clocks). Units: GPU ms without transfers; engine MiB; additional RAM range MiB; module $E$ in mJ/inference.}
     \label{tab:deployment-guide}
     \footnotesize
-    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} p{3.0 cm} l c c c}
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l l c c c c c @{}}
         \toprule
-        Scenario & Recommended Model & rank-1 & Latency & Size \\
+        Priority & Configuration & rank-1 & ms & Engine & $\Delta$RAM & $E$ \\
         \midrule
-        Maximum accuracy & DeiT3-B KD ($\alpha{=}0.1$), 10\% heads, FP16 & 0.591 & 2.6\,ms & 164\,MB \\
-        Best accuracy--speed & Swin-T KD ($\alpha{=}0.0$), 2 blk drop, FP16 & 0.583 & $\sim$1.3\,ms & 49\,MB \\
-        Minimum latency & ResNet-50, INT8 (TRT native) & 0.476 & 0.6\,ms & 24\,MB \\
-        Minimum memory  & DeiT3-S, 10\% heads, INT8 & 0.565 & 1.0\,ms & 21.7\,MB \\
+        Maximum accuracy & Swin-T KD, $\alpha{=}0$, FP16 & 0.616 & 1.34 & 55.9 & 194--208 & 23.3 \\
+        Smaller, faster KD & Swin-T KD, 2 blocks dropped, FP16 & 0.583 & 1.17 & 48.6 & 186--218 & 20.4 \\
+        Fastest baseline & ResNet-50d, FP16 & 0.476 & 0.95 & 45.3 & 179--211 & 17.2 \\
+        Compact native TRT & DeiT3-S, 10\% heads, FP16 & 0.564 & 1.02 & 42.6 & 184--197 & 17.0 \\
+        Smallest engine & DeiT3-S, 10\% heads, INT8 & 0.530 & 1.50 & 22.5 & 131--159 & 18.7 \\
         \bottomrule
     \end{tabular*}
 \end{table}
+\endgroup
 
-The first scenario---maximum accuracy with moderate size---is best served by DeiT3-B with optimized KD and conservative head pruning, delivering 0.591 rank-1 at 164\,MB (FP16) or 82\,MB (INT8). The second scenario---best accuracy--speed trade-off---favors Swin-T with KD and block dropping, which achieves 0.583 rank-1 while fitting in 49\,MB at FP16. For strict latency-critical applications (e.g., real-time video at 30+ FPS), ResNet-50 with TRT-native INT8 achieves 0.63\,ms ($\sim$1,590\,FPS) at the cost of lower accuracy (0.476 rank-1). Finally, for the most memory-constrained deployments (e.g., microcontrollers or shared-memory multi-model systems), DeiT3-S with 10\% head pruning at INT8 achieves the smallest footprint (22\,MB) while still exceeding its unpruned baseline accuracy (0.565 vs.\ 0.552).
+Native INT8 reduces the pruned DeiT3-S engine from 42.6 to 22.5\,MiB, but increases latency from 1.02 to 1.50\,ms and lowers rank-1 from 0.564 to 0.530. FP16 therefore offers the better latency--accuracy balance for this model at batch size 1, while INT8 provides the smaller engine. This illustrates why file-size reduction alone is insufficient to select a deployment precision.
 
-Two limitations of this analysis should be noted. First, all experiments were conducted on a single dataset (TinyFace) with a specific input resolution ($96\times96$); the relative performance of architectures may differ on higher-resolution inputs or non-biometric tasks. Second, latency measurements were obtained on a single hardware platform (Jetson Orin Nano with TensorRT 10.3); different accelerators (e.g., Qualcomm Hexagon DSP, Apple Neural Engine) may produce substantially different rankings due to architecture-specific kernel optimizations~\cite{Ngo2025EdgeInference}.
+INT8 also lowers observed additional RAM demand, from 184--197 to 131--159\,MiB, and mean module power from 16.6 to 12.5\,W. Its longer execution nevertheless raises energy per inference from 17.0 to 18.7\,mJ. The memory ranges overlap among the FP16 configurations, so small differences between their observed peaks should not be treated as a firm ranking.
+
+The INT8 graph introduces more reformatting (51 layers versus one) and loses fused attention operations, suggesting that conversion overhead and reduced fusion contribute to its slower execution. Larger batches may amortize these costs and improve Tensor Core utilization~\cite{NVIDIATensorRTBatching}. This could alter the throughput ranking, but larger batches were not evaluated; their potential benefit must also be weighed against queueing delay and memory use.
+
+These results are limited to TinyFace, $96\times96$ inputs, and a Jetson Orin Nano with TensorRT 10.3. Architecture rankings and precision trade-offs may change on higher-resolution or non-biometric tasks, and with different accelerators~\cite{Ngo2025EdgeInference}.
 
 \section{Conclusion}
 
-This chapter investigated the full design space for deploying vision transformers on resource-constrained embedded systems, using face identification on the TinyFace benchmark~\cite{cheng2018lowresface} as a case study. Starting from 16 model variants across six architecture families, the study systematically evaluated parameter-efficient fine-tuning via LoRA~\cite{hu2022lora}, feature-level knowledge distillation with two teacher configurations, structured pruning (head removal and block dropping), and post-training quantization (FP16, INT8)---producing over 100 model configurations that were benchmarked for both biometric accuracy and on-device inference latency on an NVIDIA Jetson Orin Nano. The resulting analysis connects architectural design choices to measurable deployment outcomes and identifies several findings with practical implications for embedded vision systems.
+This chapter investigated the full design space for deploying vision transformers on resource-constrained embedded systems, using face identification on the TinyFace benchmark~\cite{cheng2018lowresface} as a case study. Starting from 16 model variants across six architecture families, the study systematically evaluated standard LoRA~\cite{hu2022lora} sweeps and LoRA combined with progressive backbone unfreezing, feature-level knowledge distillation with two teacher configurations, structured pruning (head removal and block dropping), and post-training quantization (FP16, INT8)---producing over 100 model configurations that were benchmarked for both biometric accuracy and on-device inference latency on an NVIDIA Jetson Orin Nano. The resulting analysis connects architectural design choices to measurable deployment outcomes and identifies several findings with practical implications for embedded vision systems.
 
-The clearest finding is that on this low-resolution task, architecture choice dominates the accuracy--efficiency trade-off. Compact vision transformers consistently outperform larger CNNs: Swin-Tiny (27.5M parameters) exceeds ResNet-200 (62.6M) by $+$0.066 rank-1 in the baseline setting, and with optimally tuned knowledge distillation ($\alpha = 0.0$, frozen CVLFace teacher), Swin-Tiny reaches 0.616 rank-1---an absolute gain of $+$0.082 over its baseline (a 15.4\% relative improvement) that makes a 27.5M-parameter model competitive with unpruned 86M-parameter alternatives (Table~\ref{tab:overall-summary}). Self-attention's global receptive field appears to be a key factor when discriminative features must be extracted from severely resolution-limited inputs ($96\times96$ from $\sim$30$\times$30 native). Architecture choice also determines which optimization techniques are effective: LoRA improved all Swin variants ($+$0.010 to $+$0.028 absolute rank-1) while degrading all DeiT-3 variants ($-$0.025 to $-$0.037), and head pruning was well-tolerated by DeiT-3 but catastrophic for KD-distilled Swin models. Optimization techniques are not interchangeable black-box tools, and these architecture-dependent interactions need to be tested per family.
+The clearest finding is that on this low-resolution task, architecture choice dominates the accuracy--efficiency trade-off. Compact vision transformers consistently outperform larger CNNs: Swin-Tiny (27.5M parameters) exceeds ResNet-200 (62.6M) by $+$0.066 rank-1 in the baseline setting, and with optimally tuned knowledge distillation ($\alpha = 0.0$, frozen CVLFace teacher), Swin-Tiny reaches 0.616 rank-1---an absolute gain of $+$0.082 over its baseline (a 15.4\% relative improvement) that makes a 27.5M-parameter model competitive with unpruned 86M-parameter alternatives (Table~\ref{tab:overall-summary}). Self-attention's global receptive field appears to be a key factor when discriminative features must be extracted from severely resolution-limited inputs ($96\times96$ from $\sim$30$\times$30 native). The combined LoRA-and-unfreezing protocol improved all Swin variants ($+$0.010 to $+$0.028 absolute rank-1) while degrading all DeiT-3 variants ($-$0.025 to $-$0.037); these results do not isolate the effect of standard frozen-backbone LoRA. Head pruning was well-tolerated by DeiT-3 but catastrophic for KD-distilled Swin models. These architecture-dependent interactions need to be tested per family.
 
-Model compression proved effective when matched to the architecture. Post-training INT8 quantization is essentially cost-free, introducing at most 0.002 absolute rank-1 loss while delivering $3.8$--$3.9\times$ size reduction across all 24 pruned models tested. Structured pruning, when the pruning axis is aligned with the architecture, can maintain or even \emph{improve} accuracy: block dropping improved Swin-T ($+$0.010) and Swin-B ($+$0.028) over their baselines, confirming systematic depth over-parameterization on this task, while 10\% head pruning improved DeiT3-S ($+$0.013 to 0.565). Pruning and quantization compose without compounding losses, enabling combined compression ratios of $3.8$--$5.1\times$ (Table~\ref{tab:pruning-results}). Knowledge distillation interacts with pruning in less obvious ways: the strongest KD checkpoint (Swin-T, $\alpha{=}0.0$, rank-1 = 0.616) suffered catastrophic degradation under head pruning ($-$0.213) while block dropping remained safe (0.583). The implication is that pure feature distillation concentrates learned representations into fewer heads and creates a fragility that should be anticipated when designing a compression pipeline.
+Model compression proved effective when matched to the architecture. For four representative unpruned models, dynamic INT8 loses at most 0.0016 rank-1 with $3.8$--$3.9\times$ file-size reduction. Across 24 pruned models, its mean and median absolute changes are 0.0017 and 0.0013, with a maximum loss of 0.0099 relative to pruned FP32. FP16 is near-lossless, with at most 0.0008 absolute rank-1 change across those pruned models. After recovery fine-tuning, block dropping improves Swin-T ($+$0.010) and Swin-B ($+$0.028) at INT8 over their unpruned FP32 baselines; 10\% head pruning improves DeiT3-S ($+$0.013 to 0.565). Selected pruning-and-INT8 configurations deliver $3.8$--$5.1\times$ file-size compression (Table~\ref{tab:pruning-results}), but each requires an accuracy check. The strongest Swin-T KD checkpoint (0.616) falls to 0.403 after 10\% head pruning, while block dropping retains 0.583. This suggests an interaction between distillation and pruning; concentration of features into fewer heads remains a hypothesis rather than a measured mechanism.
 
-Hardware-in-the-loop evaluation on the Jetson Orin Nano showed that native TensorRT compatibility is architecture-dependent but, for every architecture in this study, recoverable through a principled module-level graph rewrite. Models that apply layer normalization to NCHW spatial feature maps---ConvNeXt, PVT-v2, and MobileViT-v2---initially failed \texttt{trtexec} conversion entirely, due to missing SM 8.7 kernels for 4-D normalization patterns. Several intuitive workarounds (opset decomposition, a custom NCHW normalization module, post-hoc ONNX graph surgery) all fail because TensorRT's Myelin compiler re-fuses the rewritten arithmetic back into the same unsupported \texttt{ForeignNode}. The fix that does work is per-family and module-level: ConvNeXt's \texttt{LayerNorm2d} is replaced with a wrapper that reshapes to $(B,HW,C)$ around a standard \texttt{nn.LayerNorm}, combined with timm's \texttt{conv\_mlp=True} backbone; PVT-v2's fused-attention path is disabled before export to expose a clean opset-17 graph; and MobileViT-v2's single-group \texttt{GroupNorm} is replaced by a manual elementwise decomposition. All three rewrites reproduce the original PyTorch outputs to cosine similarity $\geq 0.999$ and produce \texttt{trtexec}-compilable engines, allowing all sixteen architectures to be benchmarked under a single uniform harness. Under that harness the previously reported $4.8\times$ Swin-T vs.\ ConvNeXt-T gap (1.72\,ms vs.\ 4.53\,ms FP16) shrinks to $1.17\times$ (1.67\,ms vs.\ 1.95\,ms), and the ONNX Runtime TensorRT EP fallback---a viable workaround when a per-family rewrite is not feasible---incurs a measurable $1.5$--$2.5\times$ latency penalty relative to the rewritten native engines (e.g.\ ConvNeXt-T 4.53\,ms vs.\ 1.95\,ms FP16, MobileViT-v2-200 5.05\,ms vs.\ 1.90\,ms). Per-layer profiling (Figure~\ref{fig:layer-breakdown}) further showed that DeiT-3 models are FFN-dominated ($68$--$83\%$ of compute), Swin models distribute compute more evenly between attention and FFN ($27$--$31\%$ attention), and ResNet is almost entirely convolution-bound ($98$--$99\%$). These profiles explain why block dropping is effective for Swin (it removes both attention and FFN proportionally) while head pruning has limited latency impact (attention accounts for less than a third of total time).
+Hardware-in-the-loop evaluation on the Jetson Orin Nano showed that native TensorRT compatibility is architecture-dependent but, for every architecture in this study, recoverable through a principled module-level graph rewrite. Models that apply layer normalization to NCHW spatial feature maps---ConvNeXt, PVT-v2, and MobileViT-v2---initially failed \texttt{trtexec} conversion entirely, due to missing SM 8.7 kernels for 4-D normalization patterns. Several intuitive workarounds (opset decomposition, a custom NCHW normalization module, post-hoc ONNX graph surgery) all fail because TensorRT's Myelin compiler re-fuses the rewritten arithmetic back into the same unsupported \texttt{ForeignNode}. The fix that does work is per-family and module-level: ConvNeXt's \texttt{LayerNorm2d} is replaced with a wrapper that reshapes to $(B,HW,C)$ around a standard \texttt{nn.LayerNorm}, combined with timm's \texttt{conv\_mlp=True} backbone; PVT-v2's fused-attention path is disabled before export to expose a clean opset-17 graph; and MobileViT-v2's single-group \texttt{GroupNorm} is replaced by a manual elementwise decomposition. All three rewrites reproduce the original PyTorch outputs to cosine similarity $\geq 0.999$ and produce \texttt{trtexec}-compilable engines, allowing all sixteen architectures to be benchmarked under a single uniform harness. Under that harness the previously reported $2.63\times$ Swin-T vs.\ ConvNeXt-T gap (1.72\,ms vs.\ 4.53\,ms FP16) shrinks to $1.17\times$ (1.67\,ms vs.\ 1.95\,ms), and the ONNX Runtime TensorRT EP fallback---a viable workaround when a per-family rewrite is not feasible---incurs a measurable $1.18$--$2.66\times$ latency penalty relative to the rewritten native engines (e.g.\ ConvNeXt-T 4.53\,ms vs.\ 1.95\,ms FP16, MobileViT-v2-200 5.05\,ms vs.\ 1.90\,ms). Per-layer profiling (Figure~\ref{fig:layer-breakdown}) further showed that DeiT-3 models are FFN-dominated ($68$--$83\%$ of compute), Swin models distribute compute more evenly between attention and FFN ($27$--$31\%$ attention), and ResNet is almost entirely convolution-bound ($98$--$99\%$). These profiles explain why block dropping is effective for Swin (it removes both attention and FFN proportionally) while head pruning has limited latency impact (attention accounts for less than a third of total time).
 
-Several practical challenges shaped the experimental design. Training with the AdaFace margin-based loss~\cite{narayan2025petalface} required careful hyperparameter tuning per architecture family to avoid numerical instability, particularly for larger models. The extreme input resolution mismatch between TinyFace's native $\sim$30$\times$30 imagery and the models' expected input size meant that all models operated on heavily interpolated inputs, placing a ceiling on achievable accuracy regardless of model capacity. The Jetson Orin Nano's 8\,GB unified memory constrained batch sizes during evaluation and required exclusive use of FP16 or INT8 precisions for larger models, reinforcing the practical importance of the quantization and pruning pipeline developed in this work.
+Several practical challenges shaped the experimental design. Training with the AdaFace margin-based loss~\cite{narayan2025petalface} required careful hyperparameter tuning per architecture family to avoid numerical instability, particularly for larger models. The extreme input resolution mismatch between TinyFace's native $\sim$30$\times$30 imagery and the models' expected input size meant that all models operated on heavily interpolated inputs, placing a ceiling on achievable accuracy regardless of model capacity. The Jetson Orin Nano's 8\,GB unified memory constrained batch sizes during evaluation and made reduced precision useful for larger models, reinforcing the practical importance of the quantization and pruning pipeline developed in this work.
 
-For practitioners deploying vision transformers on embedded platforms, the experimental results support several concrete recommendations. When accuracy is the primary objective, DeiT3-B with optimized KD ($\alpha{=}0.1$) and 10\% head pruning at FP16 delivers 0.591 rank-1 at 2.6\,ms inference latency. When balancing accuracy against size and speed, Swin-T with KD ($\alpha{=}0.0$) and block dropping at INT8 achieves 0.583 rank-1 at 24.6\,MB. For the most memory-constrained deployments, DeiT3-S with 10\% head pruning at INT8 fits in 21.7\,MB while exceeding its unpruned baseline (0.565 vs.\ 0.552). Table~\ref{tab:deployment-guide} provides a consolidated decision matrix organized by deployment priority. In all cases, practitioners should validate native TRT compatibility early in the development cycle; for architectures that fail \texttt{trtexec} out of the box, the per-family module-level rewrites described in Section~\ref{sec:trt-compat-success} restore a uniform native-TRT deployment path with cosine similarity $\geq 0.999$ to the original PyTorch model.
+For practitioners, Swin-T KD ($\alpha{=}0.0$, frozen CVLFace teacher) has the highest observed student accuracy, 0.616 rank-1, at 1.34\,ms native FP16 latency in the deployment comparison. Dropping two blocks gives 0.583 rank-1, 1.17\,ms and a 48.6\,MiB engine. Pruned DeiT3-S FP16 offers 0.564 rank-1 at 1.02\,ms in a 42.6\,MiB engine. Its calibrated INT8 engine reduces storage and RAM demand, but is slower, less accurate, and uses more energy per inference. Table~\ref{tab:deployment-guide} compares these native choices. Validate TRT compatibility early; the per-family rewrites in Section~\ref{sec:trt-compat-success} restore the native path for seven initially failing architectures, with embedding cosine similarity $\geq 0.999$ to the original models.
 
 Several directions remain for future work. Joint knowledge distillation and pruning---optimizing both simultaneously rather than sequentially---may yield further improvements and potentially avoid the fragility observed when pruning KD-distilled models. Automated pruning search across both depth and width axes simultaneously could identify configurations that manual grid search misses~\cite{Park2023PTPrune}. Extending this analysis to additional edge platforms (Qualcomm Hexagon DSP, Apple Neural Engine, MediaTek APU) would reveal how architecture rankings change with hardware-specific kernel support~\cite{Ngo2025EdgeInference}. Newer efficient transformer architectures such as EfficientViT~\cite{liu2023efficientvit} and FastViT~\cite{vasu2023fastvit}, which incorporate hardware-aware design principles from their inception, may shift the Pareto front established here. Finally, evaluating these findings on higher-resolution biometric tasks and non-biometric vision domains would help establish the generality of the architecture-dependent optimization patterns observed on TinyFace.
 

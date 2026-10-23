@@ -1,0 +1,74 @@
+{
+  "measured_at_utc": "2026-10-22T18:17:50.281850+00:00",
+  "model": "deit3_small_baseline-heads_0.10",
+  "precision": "ONNX dynamic INT8",
+  "model_path": "/ssd/vit_benchmark/onnx_models_int8/pruned_v2/deit3_small_baseline-heads_0.10.onnx",
+  "model_sha256": "023f06a2a2a851e1ae794e82e621f1e2a441bec74f996e58de89874759da92ea",
+  "model_bytes": 22783647,
+  "onnxruntime_version": "1.20.2",
+  "active_providers": [
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "latency_scope": "session.run including host/device copies and CPU fallback",
+  "input_shape": [
+    1,
+    3,
+    96,
+    96
+  ],
+  "input_seed": 0,
+  "warmup": 50,
+  "iterations_per_repeat": 500,
+  "repeat_means_ms": [
+    13.415238426,
+    13.440272628,
+    13.42566526
+  ],
+  "mean_ms": 13.427058771333332,
+  "median_ms": 13.409722,
+  "p95_ms": 13.5666882,
+  "p99_ms": 14.049036469999999,
+  "std_ms": 0.16146519449827482,
+  "profile_path": "inference_results/deployment_int8_locked_profile.json.gz",
+  "profile_provider_node_counts": {
+    "CUDAExecutionProvider": 669,
+    "CPUExecutionProvider": 108
+  },
+  "profile_provider_op_counts": {
+    "CUDAExecutionProvider": {
+      "Shape": 2,
+      "Conv": 1,
+      "Reshape": 49,
+      "Transpose": 61,
+      "Add": 84,
+      "Expand": 1,
+      "Concat": 1,
+      "LayerNormalization": 24,
+      "MemcpyToHost": 48,
+      "MemcpyFromHost": 96,
+      "Cast": 48,
+      "Mul": 144,
+      "Split": 12,
+      "Squeeze": 36,
+      "FusedMatMul": 12,
+      "Softmax": 12,
+      "MatMul": 12,
+      "Div": 12,
+      "Erf": 12,
+      "SkipLayerNormalization": 1,
+      "Gather": 1
+    },
+    "CPUExecutionProvider": {
+      "Concat": 9,
+      "DynamicQuantizeLinear": 48,
+      "MatMulInteger": 48,
+      "Slice": 3
+    }
+  },
+  "profile_sha256": "792e9c2dc422e95ff8a947cf863e316c758b4d16c852c3105d4d87dab52bf0c2",
+  "clock_policy": "MAXN_SUPER; CPU locked at 1.728 GHz and GPU locked at 1.02 GHz",
+  "environment_source": "inference_results/deployment_int8_locked_environment.json",
+  "benchmark_script": "scripts/benchmark_deployment_int8.py",
+  "benchmark_script_sha256": "a19c32c5a5fa0246db80506773dccec101bba6a9dbcca33cd10ee2c25ff28a36"
+}

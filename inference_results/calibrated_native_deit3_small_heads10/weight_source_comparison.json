@@ -1,0 +1,8 @@
+{
+  "fp32_onnx_sha256": "cca7d8491c1517ff3c2c233c014b165072b2504ec7b7d941fe181ea6041f8f26",
+  "fp32_external_weights_sha256": "8598ef24226ca4b114e825a37a5d6e3b93c70d1912b9ee4f1be626feaa48c6d1",
+  "fp16_onnx_sha256": "dcf60ed3bdfe56e207ce5c42850f6da86f64e7c456abd2aec35f75963ecf4370",
+  "matching_initializer_names_and_shapes": 195,
+  "maximum_absolute_difference_from_direct_fp16_cast": 1.1920928955078125e-07,
+  "interpretation": "All 195 initializer names and shapes match; FP16 values agree with casts from this FP32 source within the small-value clipping tolerance of the FP16 converter."
+}

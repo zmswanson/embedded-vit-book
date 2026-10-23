@@ -1,0 +1,45 @@
+{
+  "size_scope": "Serialized native TensorRT engines; not ONNX files or runtime RAM",
+  "engines": [
+    {
+      "model": "swin_tiny_kd_cvlface_alpha0.0",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/kd_cvlface/fp16/swin_tiny_kd_cvlface_alpha0.0_fp16.engine",
+      "size_bytes": 58590780,
+      "size_MiB": 55.9,
+      "sha256": "ad3a05eefefe49c53beb3ffbb8a7a27ec34295e285aa8ee66e1ee77df62abaa7"
+    },
+    {
+      "model": "swin_tiny_kd_best-blocks_2",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/swin_tiny_kd_best-blocks_2_fp16.engine",
+      "size_bytes": 50978844,
+      "size_MiB": 48.6,
+      "sha256": "28ab31971344f884565f57037c0ce6b231257d7068f004c83846414f2acec0d0"
+    },
+    {
+      "model": "resnet50d",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/baselines/fp16/resnet50d_fp16.engine",
+      "size_bytes": 47547004,
+      "size_MiB": 45.3,
+      "sha256": "088c1188533770c159e18b2de090def077f1e5f174d666612618bc49cffe125b"
+    },
+    {
+      "model": "deit3_small_baseline-heads_0.10",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+      "size_bytes": 44672652,
+      "size_MiB": 42.6,
+      "sha256": "46110d5d1f9616065c13e70ba468ffc75166f65d50e81851cbd4d3ac3da2c7e7"
+    },
+    {
+      "model": "deit3_small_baseline-heads_0.10",
+      "precision": "calibrated INT8",
+      "engine_path": "/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+      "size_bytes": 23612028,
+      "size_MiB": 22.5,
+      "sha256": "c056048c9ddc0ced0c702376558f4c1d805417cf59f3f2d4b26158c9e70d2bc3"
+    }
+  ]
+}

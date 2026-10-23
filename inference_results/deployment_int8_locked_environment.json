@@ -1,0 +1,54 @@
+{
+  "collected_at_utc": "2026-10-22T18:17:51.428610+00:00",
+  "nvpmodel": "NV Power Mode: MAXN_SUPER\n2",
+  "release": "# R36 (release), REVISION: 4.3, GCID: 38968081, BOARD: generic, EABI: aarch64, DATE: Wed Jan  8 01:49:37 UTC 2025\n# KERNEL_VARIANT: oot\nTARGET_USERSPACE_LIB_DIR=nvidia\nTARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia",
+  "device_model": "NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super",
+  "container_image": "dustynv/onnxruntime:1.20.2-r36.4.0",
+  "container_image_id": "sha256:b922b269a0a007e773cef5c1f1157e8d887d568566669bbe1cf1fc136d6d2265",
+  "cpu": {
+    "cpu5": {
+      "scaling_min_freq": "1728000",
+      "scaling_max_freq": "1728000",
+      "scaling_cur_freq": "1728000",
+      "scaling_governor": "schedutil"
+    },
+    "cpu3": {
+      "scaling_min_freq": "1728000",
+      "scaling_max_freq": "1728000",
+      "scaling_cur_freq": "1728000",
+      "scaling_governor": "schedutil"
+    },
+    "cpu1": {
+      "scaling_min_freq": "1728000",
+      "scaling_max_freq": "1728000",
+      "scaling_cur_freq": "1728000",
+      "scaling_governor": "schedutil"
+    },
+    "cpu4": {
+      "scaling_min_freq": "1728000",
+      "scaling_max_freq": "1728000",
+      "scaling_cur_freq": "1728000",
+      "scaling_governor": "schedutil"
+    },
+    "cpu2": {
+      "scaling_min_freq": "1728000",
+      "scaling_max_freq": "1728000",
+      "scaling_cur_freq": "1728000",
+      "scaling_governor": "schedutil"
+    },
+    "cpu0": {
+      "scaling_min_freq": "1728000",
+      "scaling_max_freq": "1728000",
+      "scaling_cur_freq": "1728000",
+      "scaling_governor": "schedutil"
+    }
+  },
+  "gpu": {
+    "17000000.gpu": {
+      "min_freq": "1020000000",
+      "max_freq": "1020000000",
+      "cur_freq": "1020000000",
+      "governor": "nvhost_podgov"
+    }
+  }
+}

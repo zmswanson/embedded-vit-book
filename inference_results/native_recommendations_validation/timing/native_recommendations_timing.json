@@ -1,0 +1,409 @@
+{
+  "measured_at_utc": "2026-10-22T20:34:16.521156+00:00",
+  "nvpmodel": "NV Power Mode: MAXN_SUPER\n2",
+  "clocks_before": {
+    "cpu": {
+      "cpu5": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu3": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu1": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu4": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu2": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu0": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      }
+    },
+    "gpu": {
+      "17000000.gpu": {
+        "min_freq": "1020000000",
+        "max_freq": "1020000000",
+        "cur_freq": "1020000000"
+      }
+    }
+  },
+  "input_shape": [
+    1,
+    3,
+    96,
+    96
+  ],
+  "repeats": 3,
+  "latency_scope": "Native TensorRT GPU compute only; no transfers; CUDA Graph",
+  "script_sha256": "f207337f8a4037659df90d7295907ae781628df5adf977dd21cd246566e59ab1",
+  "helper_script_sha256": "97254432775e439a55e95d103cbe0294716e7efe683446cafd0ca4feb1207a80",
+  "engine_manifest_sha256": "b649ba055600afd47c137a1a9d12c4708a7935fdde87cd0c325b5c0481ce9ee2",
+  "engines": {
+    "swin_tiny_kd": {
+      "model": "swin_tiny_kd_cvlface_alpha0.0",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/kd_cvlface/fp16/swin_tiny_kd_cvlface_alpha0.0_fp16.engine",
+      "size_bytes": 58590780,
+      "size_MiB": 55.9,
+      "sha256": "ad3a05eefefe49c53beb3ffbb8a7a27ec34295e285aa8ee66e1ee77df62abaa7",
+      "trials": [
+        {
+          "min": 1.3374,
+          "max": 1.35254,
+          "mean": 1.34449,
+          "median": 1.34448,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/kd_cvlface/fp16/swin_tiny_kd_cvlface_alpha0.0_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "swin_tiny_kd_1.log",
+          "log_sha256": "4a71c3599f51182abd9fc2d42753ba503300ab636a24edd2a415a1c639252c44"
+        },
+        {
+          "min": 1.33716,
+          "max": 1.35669,
+          "mean": 1.34398,
+          "median": 1.34399,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/kd_cvlface/fp16/swin_tiny_kd_cvlface_alpha0.0_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "swin_tiny_kd_2.log",
+          "log_sha256": "9fb816beb7fba8768df974f3c91d7525874ea2192a2621ba294c956b79fcc605"
+        },
+        {
+          "min": 1.3396,
+          "max": 1.36029,
+          "mean": 1.34583,
+          "median": 1.34576,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/kd_cvlface/fp16/swin_tiny_kd_cvlface_alpha0.0_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "swin_tiny_kd_3.log",
+          "log_sha256": "29a7035ce47df3f18ffd5b07f8e3a36fa4b6a45b78869c02687675164a8b29d1"
+        }
+      ],
+      "mean_ms": 1.3447666666666667
+    },
+    "swin_tiny_kd_blocks2": {
+      "model": "swin_tiny_kd_best-blocks_2",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/swin_tiny_kd_best-blocks_2_fp16.engine",
+      "size_bytes": 50978844,
+      "size_MiB": 48.6,
+      "sha256": "28ab31971344f884565f57037c0ce6b231257d7068f004c83846414f2acec0d0",
+      "trials": [
+        {
+          "min": 1.16162,
+          "max": 1.1792,
+          "mean": 1.16878,
+          "median": 1.16846,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/swin_tiny_kd_best-blocks_2_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "swin_tiny_kd_blocks2_1.log",
+          "log_sha256": "d4497c8537935099983affa4dc8169723f38554ef509d890726086897fcfba1e"
+        },
+        {
+          "min": 1.1604,
+          "max": 1.17535,
+          "mean": 1.16726,
+          "median": 1.16705,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/swin_tiny_kd_best-blocks_2_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "swin_tiny_kd_blocks2_2.log",
+          "log_sha256": "dd27d8136346295cf090ac522da6bf0bd94fde5efc8e89a411927a16fa2bc7aa"
+        },
+        {
+          "min": 1.16162,
+          "max": 1.17847,
+          "mean": 1.16889,
+          "median": 1.1687,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/swin_tiny_kd_best-blocks_2_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "swin_tiny_kd_blocks2_3.log",
+          "log_sha256": "76723151b45aa3b90817fa39b0f7af0f28c38518edf092256294a5f1587e349d"
+        }
+      ],
+      "mean_ms": 1.16831
+    },
+    "resnet50d": {
+      "model": "resnet50d",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/baselines/fp16/resnet50d_fp16.engine",
+      "size_bytes": 47547004,
+      "size_MiB": 45.3,
+      "sha256": "088c1188533770c159e18b2de090def077f1e5f174d666612618bc49cffe125b",
+      "trials": [
+        {
+          "min": 0.945679,
+          "max": 0.954102,
+          "mean": 0.949566,
+          "median": 0.949463,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/baselines/fp16/resnet50d_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "resnet50d_1.log",
+          "log_sha256": "ae0dfa79d2f1d3e44d6cca924ce0a0a7c5dc96bd797d03ee7e0c39d364511d47"
+        },
+        {
+          "min": 0.943848,
+          "max": 0.952515,
+          "mean": 0.947443,
+          "median": 0.947388,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/baselines/fp16/resnet50d_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "resnet50d_2.log",
+          "log_sha256": "1f4b6a173c2223af94f4e26ddab8fe0a6259655ad1b0fe541a6869d6274862cb"
+        },
+        {
+          "min": 0.947998,
+          "max": 0.957275,
+          "mean": 0.952872,
+          "median": 0.952881,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/baselines/fp16/resnet50d_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "resnet50d_3.log",
+          "log_sha256": "53a116a664ee0cc7ed671a9a59303d38adbb5211978b0708a25a28f11138ae23"
+        }
+      ],
+      "mean_ms": 0.9499603333333334
+    },
+    "deit3_small_fp16": {
+      "model": "deit3_small_baseline-heads_0.10",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+      "size_bytes": 44672652,
+      "size_MiB": 42.6,
+      "sha256": "46110d5d1f9616065c13e70ba468ffc75166f65d50e81851cbd4d3ac3da2c7e7",
+      "trials": [
+        {
+          "min": 1.02075,
+          "max": 1.02795,
+          "mean": 1.02442,
+          "median": 1.02441,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "deit3_small_fp16_1.log",
+          "log_sha256": "d0977d3a5df7ecfff555f13886ca85ae4bdecaefcc6bf8557715b8defcb70c05"
+        },
+        {
+          "min": 1.02094,
+          "max": 1.0293,
+          "mean": 1.02473,
+          "median": 1.02466,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "deit3_small_fp16_2.log",
+          "log_sha256": "23091122809de265beaef1979a0eb4e64c6277464d9642ddd8dd3bae3673a24f"
+        },
+        {
+          "min": 1.01904,
+          "max": 1.02686,
+          "mean": 1.02296,
+          "median": 1.02295,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "deit3_small_fp16_3.log",
+          "log_sha256": "72ff9659253d4980e5113b896e1e9e97bd35b62324a84a9ccec32b59aa437086"
+        }
+      ],
+      "mean_ms": 1.0240366666666667
+    },
+    "deit3_small_int8": {
+      "model": "deit3_small_baseline-heads_0.10",
+      "precision": "calibrated INT8",
+      "engine_path": "/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+      "size_bytes": 23612028,
+      "size_MiB": 22.5,
+      "sha256": "c056048c9ddc0ced0c702376558f4c1d805417cf59f3f2d4b26158c9e70d2bc3",
+      "trials": [
+        {
+          "min": 1.4917,
+          "max": 1.49902,
+          "mean": 1.49518,
+          "median": 1.49512,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "deit3_small_int8_1.log",
+          "log_sha256": "3f4c4bdd9a2c50511ac0eb8d507e5b3537e1c639a3a7988ab669f0519013abd6"
+        },
+        {
+          "min": 1.49634,
+          "max": 1.50366,
+          "mean": 1.49969,
+          "median": 1.49976,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "deit3_small_int8_2.log",
+          "log_sha256": "3f0ea614aeb7bbec735fa8cf1e0f868915d76219e629a303cf51ce213d4a298a"
+        },
+        {
+          "min": 1.49292,
+          "max": 1.50024,
+          "mean": 1.49658,
+          "median": 1.49658,
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ],
+          "log_file": "deit3_small_int8_3.log",
+          "log_sha256": "556c3f3f0f5b3ee9e0b188c252ab692724b6727347b5b0ca312e18063018ea39"
+        }
+      ],
+      "mean_ms": 1.49715
+    }
+  },
+  "clocks_after": {
+    "cpu": {
+      "cpu5": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu3": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu1": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu4": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu2": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu0": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      }
+    },
+    "gpu": {
+      "17000000.gpu": {
+        "min_freq": "1020000000",
+        "max_freq": "1020000000",
+        "cur_freq": "1020000000"
+      }
+    }
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "model": "deit3_small_baseline-heads_0.10",
+  "measured_at_utc": "2026-10-22T18:53:43.419942+00:00",
+  "nvpmodel": "NV Power Mode: MAXN_SUPER\n2",
+  "clocks_before": {
+    "cpu": {
+      "cpu5": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu3": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu1": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu4": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu2": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu0": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      }
+    },
+    "gpu": {
+      "17000000.gpu": {
+        "min_freq": "1020000000",
+        "max_freq": "1020000000",
+        "cur_freq": "1020000000"
+      }
+    }
+  },
+  "latency_scope": "native TensorRT GPU compute only, no transfers, CUDA Graph",
+  "input_shape": [
+    1,
+    3,
+    96,
+    96
+  ],
+  "warmup_ms": 500,
+  "minimum_iterations_per_repeat": 2000,
+  "engines": {
+    "fp16": {
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+      "engine_sha256": "46110d5d1f9616065c13e70ba468ffc75166f65d50e81851cbd4d3ac3da2c7e7",
+      "engine_bytes": 44672652,
+      "trials": [
+        {
+          "min": 1.02026,
+          "max": 1.06335,
+          "mean": 1.02382,
+          "median": 1.02368,
+          "log_file": "fp16_1.log",
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ]
+        },
+        {
+          "min": 1.01904,
+          "max": 1.02661,
+          "mean": 1.02286,
+          "median": 1.02295,
+          "log_file": "fp16_2.log",
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ]
+        },
+        {
+          "min": 1.01904,
+          "max": 1.02686,
+          "mean": 1.02281,
+          "median": 1.02283,
+          "log_file": "fp16_3.log",
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ]
+        }
+      ],
+      "mean_ms": 1.0231633333333334
+    },
+    "calibrated_int8": {
+      "engine_path": "/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+      "engine_sha256": "c056048c9ddc0ced0c702376558f4c1d805417cf59f3f2d4b26158c9e70d2bc3",
+      "engine_bytes": 23612028,
+      "trials": [
+        {
+          "min": 1.49414,
+          "max": 1.50305,
+          "mean": 1.49805,
+          "median": 1.49805,
+          "log_file": "calibrated_int8_1.log",
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ]
+        },
+        {
+          "min": 1.49463,
+          "max": 1.50281,
+          "mean": 1.49862,
+          "median": 1.49854,
+          "log_file": "calibrated_int8_2.log",
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ]
+        },
+        {
+          "min": 1.49356,
+          "max": 1.50195,
+          "mean": 1.49704,
+          "median": 1.49695,
+          "log_file": "calibrated_int8_3.log",
+          "command": [
+            "/usr/src/tensorrt/bin/trtexec",
+            "--loadEngine=/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+            "--warmUp=500",
+            "--iterations=2000",
+            "--noDataTransfers",
+            "--useCudaGraph",
+            "--memPoolSize=workspace:2048MiB"
+          ]
+        }
+      ],
+      "mean_ms": 1.4979033333333334
+    }
+  },
+  "clocks_after": {
+    "cpu": {
+      "cpu5": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu3": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu1": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu4": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu2": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      },
+      "cpu0": {
+        "scaling_min_freq": "1728000",
+        "scaling_max_freq": "1728000",
+        "scaling_cur_freq": "1728000"
+      }
+    },
+    "gpu": {
+      "17000000.gpu": {
+        "min_freq": "1020000000",
+        "max_freq": "1020000000",
+        "cur_freq": "1020000000"
+      }
+    }
+  },
+  "benchmark_script_sha256": "eb8ee1f184987004b6bca2f74fd90f53875fc45055a4c6da60e0be97fcb5b86a"
+}

@@ -1,0 +1,77 @@
+{
+  "measured_at_utc": "2026-10-22T20:14:02.024636+00:00",
+  "protocol": "Gallery_Match + Probe only, matching the existing chapter; no distractors",
+  "gallery_images": 4443,
+  "probe_images": 3728,
+  "input_shape": [
+    1,
+    3,
+    96,
+    96
+  ],
+  "image_archive_sha256": "6c9eaf8802bec3a077859051d6c8b69e5fd50fac9b890898c1acb2bafbd68488",
+  "evaluation_script_sha256": "61cf7c4e44eb5b6be7d669941e8aea83379263862980665a1bf411d1385ce08f",
+  "inference_helper_sha256": "e7c77c586e2e281caf3f779099483ee3fe30c6b5ab77f7d4531d561dbac7b54d",
+  "engines": {
+    "swin_tiny_kd": {
+      "model": "swin_tiny_kd_cvlface_alpha0.0",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/kd_cvlface/fp16/swin_tiny_kd_cvlface_alpha0.0_fp16.engine",
+      "size_bytes": 58590780,
+      "size_MiB": 55.9,
+      "sha256": "ad3a05eefefe49c53beb3ffbb8a7a27ec34295e285aa8ee66e1ee77df62abaa7",
+      "rank1": 0.6158798283261803,
+      "correct_probes": 2296,
+      "probe_predictions_file": "swin_tiny_kd_predictions.json",
+      "embedding_dimension": 768
+    },
+    "swin_tiny_kd_blocks2": {
+      "model": "swin_tiny_kd_best-blocks_2",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/swin_tiny_kd_best-blocks_2_fp16.engine",
+      "size_bytes": 50978844,
+      "size_MiB": 48.6,
+      "sha256": "28ab31971344f884565f57037c0ce6b231257d7068f004c83846414f2acec0d0",
+      "rank1": 0.5828862660944206,
+      "correct_probes": 2173,
+      "probe_predictions_file": "swin_tiny_kd_blocks2_predictions.json",
+      "embedding_dimension": 768
+    },
+    "resnet50d": {
+      "model": "resnet50d",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/baselines/fp16/resnet50d_fp16.engine",
+      "size_bytes": 47547004,
+      "size_MiB": 45.3,
+      "sha256": "088c1188533770c159e18b2de090def077f1e5f174d666612618bc49cffe125b",
+      "rank1": 0.4761266094420601,
+      "correct_probes": 1775,
+      "probe_predictions_file": "resnet50d_predictions.json",
+      "embedding_dimension": 2048
+    },
+    "deit3_small_fp16": {
+      "model": "deit3_small_baseline-heads_0.10",
+      "precision": "FP16",
+      "engine_path": "/ssd/vit_benchmark/trt_engines/pruned_v2/fp16/deit3_small_baseline-heads_0.10_fp16.engine",
+      "size_bytes": 44672652,
+      "size_MiB": 42.6,
+      "sha256": "46110d5d1f9616065c13e70ba468ffc75166f65d50e81851cbd4d3ac3da2c7e7",
+      "rank1": 0.5638412017167382,
+      "correct_probes": 2102,
+      "probe_predictions_file": "deit3_small_fp16_predictions.json",
+      "embedding_dimension": 384
+    },
+    "deit3_small_int8": {
+      "model": "deit3_small_baseline-heads_0.10",
+      "precision": "calibrated INT8",
+      "engine_path": "/ssd/vit_benchmark/results/deit3_small_heads10_required_int8/deit3_small_heads10_calibrated_int8.engine",
+      "size_bytes": 23612028,
+      "size_MiB": 22.5,
+      "sha256": "c056048c9ddc0ced0c702376558f4c1d805417cf59f3f2d4b26158c9e70d2bc3",
+      "rank1": 0.5303111587982833,
+      "correct_probes": 1977,
+      "probe_predictions_file": "deit3_small_int8_predictions.json",
+      "embedding_dimension": 384
+    }
+  }
+}

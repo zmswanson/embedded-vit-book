@@ -1,7 +1,7 @@
 #!/bin/bash
 # Train Baseline Models (No LoRA)
 #
-# Full fine-tuning baselines with AdaFace heads for all 6 target models.
+# Baselines without adapters, using progressive unfreezing and AdaFace heads.
 # Swin family uses best config from vit_book_adaface sweep (rank@1 = 0.5543).
 # DeiT3 family uses model ablation config (no separate DeiT3 AdaFace sweep).
 #

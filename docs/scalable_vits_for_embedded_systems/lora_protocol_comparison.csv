@@ -1,0 +1,15 @@
+role,model,run_id,head_type,lora_enabled,lora_rank,lora_qkv_proj,gradual_unfreeze,max_epochs,batch_size,sweep_eval_rank1,reported_test_rank1,selected_checkpoint_epoch_zero_based,selected_original_backbone_trainable_percent,final_original_backbone_trainable_percent
+standard_lora_sweep,Swin-B,2w6cabwo,adaface,True,24,1,none,40,8,0.5813953280448914,,,0.000000,0.000000
+standard_lora_sweep,DeiT3-B,ynikvllu,adaface,True,4,1,none,40,8,0.5891472697257996,,,0.000000,0.000000
+hybrid_lora_final,Swin-T,f0frj93y,adaface,True,24,3,stage,50,8,,0.5616952776908875,25,95.647320,95.647320
+hybrid_lora_final,Swin-S,ymm0k0ub,adaface,True,24,3,stage,50,8,,0.5544527769088745,45,97.547361,97.547361
+hybrid_lora_final,Swin-B,ci53ufy8,adaface,True,8,3,stage,50,8,,0.5359442234039307,39,97.554442,97.554442
+hybrid_lora_final,DeiT3-S,cocm8b7d,adaface,True,4,3,block,50,8,,0.5273604989051819,17,24.641106,65.709616
+hybrid_lora_final,DeiT3-M,dpwn5kb1,adaface,True,4,3,block,50,8,,0.533261775970459,26,41.216072,65.945714
+hybrid_lora_final,DeiT3-B,2ljjzfzb,adaface,True,4,3,block,50,8,,0.5496244430541992,8,8.272988,66.183904
+paired_no_adapter_baseline,Swin-T,p09btsx3,adaface,False,,,stage,50,8,,0.533530056476593,22,95.647320,95.647320
+paired_no_adapter_baseline,Swin-S,rbeovm8i,adaface,False,,,stage,50,8,,0.5391631126403809,44,97.547361,97.547361
+paired_no_adapter_baseline,Swin-B,xd7hukv3,adaface,False,,,stage,50,8,,0.5260193347930908,37,97.554442,97.554442
+paired_no_adapter_baseline,DeiT3-S,rdsdt7xb,adaface,False,,,block,50,8,,0.5515021681785583,47,65.709616,65.709616
+paired_no_adapter_baseline,DeiT3-M,k102lp3v,adaface,False,,,block,50,8,,0.5702789425849915,44,65.945714,65.945714
+paired_no_adapter_baseline,DeiT3-B,vimriwcl,adaface,False,,,block,50,8,,0.5834227204322815,44,66.183904,66.183904

@@ -1,0 +1,43 @@
+{
+  "captured_at_utc": "2026-10-22T20:35:43Z",
+  "model": "NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super",
+  "platform": "Linux-5.15.148-tegra-aarch64-with-glibc2.35",
+  "l4t": "# R36 (release), REVISION: 4.3, GCID: 38968081, BOARD: generic, EABI: aarch64, DATE: Wed Jan  8 01:49:37 UTC 2025\n# KERNEL_VARIANT: oot\nTARGET_USERSPACE_LIB_DIR=nvidia\nTARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia",
+  "tensorrt": "10.3.0",
+  "numpy": "2.2.6",
+  "pillow": "9.0.1",
+  "nvpmodel": {
+    "command": [
+      "nvpmodel",
+      "-q"
+    ],
+    "returncode": 0,
+    "output": "NV Power Mode: MAXN_SUPER\n2"
+  },
+  "tegrastats": {
+    "command": [
+      "timeout",
+      "2",
+      "tegrastats",
+      "--interval",
+      "500"
+    ],
+    "returncode": 124,
+    "output": "10-22-2026 15:35:43 RAM 1142/7620MB (lfb 89x4MB) SWAP 0/3810MB (cached 0MB) CPU [4%@1728,3%@1728,0%@1728,2%@1728,47%@1728,0%@1728] GR3D_FREQ 0% cpu@57.093C soc2@56.375C soc0@57.125C gpu@57.593C tj@57.812C soc1@57.812C VDD_IN 7356mW/7356mW VDD_CPU_GPU_CV 1974mW/1974mW VDD_SOC 2491mW/2491mW\n10-22-2026 15:35:44 RAM 1142/7620MB (lfb 89x4MB) SWAP 0/3810MB (cached 0MB) CPU [0%@1728,0%@1728,0%@1728,0%@1728,0%@1728,0%@1728] GR3D_FREQ 0% cpu@56.875C soc2@56.312C soc0@57C gpu@57.906C tj@57.906C soc1@57.906C VDD_IN 7000mW/7178mW VDD_CPU_GPU_CV 1697mW/1836mW VDD_SOC 2491mW/2491mW\n10-22-2026 15:35:44 RAM 1142/7620MB (lfb 89x4MB) SWAP 0/3810MB (cached 0MB) CPU [0%@1728,0%@1728,0%@1728,1%@1728,0%@1728,0%@1728] GR3D_FREQ 0% cpu@56.875C soc2@56.375C soc0@57.187C gpu@57.625C tj@57.781C soc1@57.781C VDD_IN 6921mW/7092mW VDD_CPU_GPU_CV 1619mW/1763mW VDD_SOC 2491mW/2491mW"
+  },
+  "sensor": {
+    "in1_label": "VDD_IN",
+    "samples": "512",
+    "update_interval": "1",
+    "in1_input": "4944",
+    "curr1_input": "1384",
+    "name": "ina3221"
+  },
+  "emc_nvpmodel_config": [
+    "<PARAM TYPE=CLOCK NAME=EMC >",
+    "EMC MAX_FREQ 2133000000",
+    "EMC MAX_FREQ 3199000000",
+    "< POWER_MODEL ID=2 NAME=MAXN_SUPER >",
+    "EMC MAX_FREQ -1"
+  ]
+}

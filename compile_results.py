@@ -202,7 +202,7 @@ Model & Family & Params (M) & Embed Dim & Rank@1 \\
 
 
 # ═════════════════════════════════════════════════════════════════════
-# TABLE 2: LoRA vs Full Fine-Tuning
+# TABLE 2: LoRA with unfreezing vs no-adapter unfreezing
 # ═════════════════════════════════════════════════════════════════════
 def table_lora_results():
     # Values from experiments (kd_comparison_final.md Table 1)
@@ -217,8 +217,9 @@ def table_lora_results():
 
     header = r"""\begin{table}[t]
 \centering
-\caption{LoRA vs.\ full fine-tuning on TinyFace. LoRA consistently improves Swin
-but degrades DeiT-3 performance, revealing architecture-dependent response.}
+\caption{Test-set comparison of LoRA with progressive backbone unfreezing
+against progressive unfreezing without adapters. The separately tuned hybrid
+configurations improve Swin but degrade DeiT-3 performance.}
 \label{tab:lora-results}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c}
 \toprule
@@ -285,31 +286,35 @@ def table_quantization_results():
     header = r"""\begin{table}[t]
 \centering
 \caption{Post-training quantization results for representative models.
-FP16 conversion is effectively lossless. INT8 dynamic quantization
-induces rank-1 drops of at most 0.16 percentage points.}
+FP16 changes rank-1 by at most 0.0005 across these four unpruned models.
+INT8 dynamic quantization induces rank-1 drops of at most 0.0016.}
 \label{tab:quantization-full}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}} l c c c c}
 \toprule
 Model & Precision & Size (MB) & Rank@1 & $\Delta$ Rank@1 \\
 \midrule
 """
-    data = [
-        ("Swin-T Baseline",        "FP32", 106.9, 0.5335, "---"),
-        ("",                        "FP16",  54.1, 0.5335, "0.000"),
-        ("",                        "INT8",  28.3, 0.5322, "$-$0.001"),
-        ("\\midrule", "", "", "", ""),
-        ("Swin-T KD (CVLFace)",    "FP32", 106.9, 0.5491, "---"),
-        ("",                        "FP16",  54.1, 0.5494, "$+$0.000"),
-        ("",                        "INT8",  28.3, 0.5475, "$-$0.002"),
-        ("\\midrule", "", "", "", ""),
-        ("DeiT3-B KD (CVLFace)",   "FP32", 327.7, 0.5719, "---"),
-        ("",                        "FP16", 164.2, 0.5714, "$-$0.001"),
-        ("",                        "INT8",  84.6, 0.5727, "$+$0.001"),
-        ("\\midrule", "", "", "", ""),
-        ("DeiT3-B LoRA",           "FP32", 327.7, 0.5496, "---"),
-        ("",                        "FP16", 164.2, 0.5496, "0.000"),
-        ("",                        "INT8",  84.6, 0.5486, "$-$0.001"),
-    ]
+    names = {
+        "swin_tiny_baseline": "Swin-T Baseline",
+        "swin_tiny_kd_cvlface_frozen": "Swin-T KD (CVLFace)",
+        "deit3_base_kd_cvlface_frozen": "DeiT3-B KD (CVLFace)",
+        "deit3_base_lora": "DeiT3-B LoRA",
+    }
+    summary = pd.read_csv(os.path.join(QUANT_DIR, "quantization_summary.csv"))
+    data = []
+    for model, name in names.items():
+        if data:
+            data.append(("\\midrule", "", "", "", ""))
+        group = summary[summary["model"] == model].set_index("precision")
+        for precision in ("FP32", "FP16", "INT8"):
+            row = group.loc[precision]
+            change = row["rank_at_1"] - group.loc["FP32", "rank_at_1"]
+            delta = "---" if precision == "FP32" else (
+                ("$+$" if change > 0 else "$-$" if change < 0 else "")
+                + f"{abs(change):.4f}"
+            )
+            data.append((name if precision == "FP32" else "", precision,
+                         float(row["file_size_MB"]), float(row["rank_at_1"]), delta))
     body = ""
     for row in data:
         if row[0].startswith("\\"):
@@ -358,7 +363,9 @@ Architecture & Variant & Pruning & Params (M) & Rank@1 & Compression \\
         prune_str = str(r['prune_method'])
         if prune_str == "nan" or prune_str == "":
             prune_str = "--- (source)"
-        body += f"{arch} & {r['variant']} & {prune_str} & {r['params_M']:.1f} & {r['rank_at_1']:.4f} & {r['compression_ratio']:.2f}$\\times$ \\\\\n"
+        # Historical pruning filenames say LoRA, but the launch script used vimriwcl.
+        variant = "Baseline" if arch == "DeiT3-B" and r["variant"] == "LoRA" else r["variant"]
+        body += f"{arch} & {variant} & {prune_str} & {r['params_M']:.1f} & {r['rank_at_1']:.4f} & {r['compression_ratio']:.2f}$\\times$ \\\\\n"
     footer = r"""\bottomrule
 \end{tabular*}
 \end{table}

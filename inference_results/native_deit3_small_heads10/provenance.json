@@ -1,0 +1,55 @@
+{
+  "model": "deit3_small_baseline-heads_0.10",
+  "fp16_onnx_export": {
+    "model": "deit3_small_baseline-heads_0.10",
+    "precision": "FP16",
+    "onnx_path": "onnx_models_fp16/pruned_v2/deit3_small_baseline-heads_0.10.onnx",
+    "size_bytes": 42627384,
+    "size_MiB": 40.7,
+    "sha256": "dcf60ed3bdfe56e207ce5c42850f6da86f64e7c456abd2aec35f75963ecf4370",
+    "external_data_files": 0
+  },
+  "pruned_checkpoint_record": {
+    "experiment": "deit3_small_baseline-heads_0.10",
+    "model_name": "deit3_small_patch16_224.fb_in1k",
+    "source_ckpt": "/mnt/data/wandb/checkpoints/vit_book_final_baselines/rdsdt7xb/epoch=47-rank1tinyface/eval/rank@1=0.562.ckpt",
+    "prune_method": "heads",
+    "head_prune_ratio": "0.1",
+    "num_blocks_to_remove": "0",
+    "params_before": "22501248",
+    "params_after": "21811776",
+    "compression": "0.0306",
+    "finetune_epochs": "10",
+    "finetune_lr": "3e-05",
+    "eval_rank1": "0.5911",
+    "test_rank1": "0.5644",
+    "best_ckpt": "/home/zms/engineering/scalable-vits-book/pruned_models_v2/epoch=4-rank1tinyface/eval/rank@1=0.591.ckpt"
+  },
+  "native_timing_script": "scripts/benchmark_native_deployment.py",
+  "native_accuracy_script": "scripts/evaluate_native_deployment.py",
+  "evidence_sha256": {
+    "fp16_2.log.gz": "83393d74130c843b619d3a367674eaec9a506fdb82a7e4290965e171cb42fecc",
+    "int8_engine_inspection.log.gz": "1f14761ab95cc5562bee4ffd321e10453e7dd38eae5848ef34f233b6c6b8068b",
+    "native_deit3_small_heads10.json": "42d582ccd7342c03e854deb78d0927bb17d2d8aa3044fc3971572c8af5832982",
+    "native_deit3_small_heads10_accuracy.json": "680182b02973600b8424554bf040f17f304214e614e4260d377bc8c129ab13a2",
+    "int8_labeled_1.log.gz": "85f4cf1dd9f3870f0db30270bae9566f2c02e4d51378febd983371cbfd4f7435",
+    "int8_labeled_2.log.gz": "9f00c8086a4350d79bdaa19deb00f59408f4671e85cb7dab2863660d9e248908",
+    "fp16_3.log.gz": "05bc2fa69cdfbdb8c80c20dc78a9264f4a052bfc383f156afeacebc24c9da77b",
+    "int8_engine_inspector.json": "fae13a0d139558ca58d5b039847858f29506b74bd1466ccf9c6b96d223eae810",
+    "fp16_predictions.json": "9bdd548b04b1fe23138f878a8dccf8d4ef693349c3a095f2f47bdda357b1f69f",
+    "fp16_1.log.gz": "a4ef58a6986638a971bdf60bbc2afcf2058d9d30f797cdff5c46cb2400e28a15",
+    "int8_labeled_predictions.json": "6145a636f56a9f1f790e701c8f83147e834896d3a30d54a5e21ba1ebe181ab8a",
+    "int8_labeled_3.log.gz": "ba3c31eaa785203201bec1eb44aebc65b5782dc7d07dcc6852dba54ef05af823"
+  },
+  "int8_labeled_engine_status": "Timing and rank-1 measured; calibration provenance unverified. The saved engine inspector reports layer names only, so internal integer precision cannot be established. Not used as a calibrated INT8 deployment recommendation.",
+  "uncompressed_log_sha256": {
+    "fp16_2.log.gz": "cf6dc927299e42debb0e1f7fc52921676bda19eecc1411297ed89b67db72653a",
+    "int8_engine_inspection.log.gz": "892b4cd5232fd17cfe07d31777cb50e6c92fb101f1975015be44bcdcaf541621",
+    "int8_labeled_1.log.gz": "db0337a679e02f055c75cb70da5c77a78f878dcf7e1ad62dd8833193e16d63d7",
+    "int8_labeled_2.log.gz": "c3c2f7073863dd16cca08a3acfdc02e08d65e4660950d422f65b3f0565e0658c",
+    "fp16_3.log.gz": "dda7227831383b4886d488069b67303dc0329498cddfd365fbec76fcbc6364c0",
+    "fp16_1.log.gz": "cf0b84f7f28944038806baf524580e0a5a265e45676ce231839ee1b86b14ea0b",
+    "int8_labeled_3.log.gz": "5def0fe01f202d3bf434b93237e1b3c5fd03e86e9af5a6aac5817d98adae0181"
+  },
+  "log_storage": "Logs are archived as .log.gz; uncompressed_log_sha256 preserves the original log-byte digests."
+}

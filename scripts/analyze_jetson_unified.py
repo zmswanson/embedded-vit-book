@@ -51,15 +51,6 @@ PRETTY = {
     "mobilevitv2_200": "MobileViTv2-200",
 }
 
-PARAMS_M = {
-    "resnet50d": 25.6, "resnet101d": 44.6, "resnet200d": 64.7,
-    "deit3_small": 21.7, "deit3_medium": 38.3, "deit3_base": 85.8,
-    "swin_tiny": 27.5, "swin_small": 49.6, "swin_base": 86.7,
-    "convnext_tiny": 28.6, "convnext_small": 50.2, "convnext_base": 87.6,
-    "pvt_v2_b2": 25.4, "pvt_v2_b3": 45.2, "pvt_v2_b5": 82.0,
-    "mobilevitv2_200": 18.4,
-}
-
 FAMILY_OF = {
     **{m: "ResNet" for m in ["resnet50d", "resnet101d", "resnet200d"]},
     **{m: "DeiT-3" for m in ["deit3_small", "deit3_medium", "deit3_base"]},
@@ -263,29 +254,29 @@ def write_unified_table(df: pd.DataFrame, rank1: dict, out_tex: Path) -> None:
         fps16 = 1000.0 / l16 if l16 == l16 else np.nan
         sp = (l32 / l16) if (l32 == l32 and l16 == l16) else np.nan
         r1 = rank1.get(m, np.nan)
-        rows.append((m, PARAMS_M.get(m, np.nan), l32, fps32, l16, fps16, sp, r1))
+        rows.append((m, l32, fps32, l16, fps16, sp, r1))
 
     def fnum(v, spec=".2f"):
         return "---" if (v != v) else format(v, spec)
 
     body = ""
     last_family = None
-    for m, p, l32, fps32, l16, fps16, sp, r1 in rows:
+    for m, l32, fps32, l16, fps16, sp, r1 in rows:
         fam = FAMILY_OF[m]
         if fam != last_family and last_family is not None:
             body += "\\addlinespace[2pt]\n"
         last_family = fam
-        body += (f"{PRETTY[m]} & {fnum(p, '.1f')} & "
+        body += (f"{PRETTY[m]} & "
                  f"{fnum(l32)} & {fnum(fps32, '.0f')} & "
                  f"{fnum(l16)} & {fnum(fps16, '.0f')} & "
                  f"{fnum(sp, '.2f')}$\\times$ & {fnum(r1, '.3f')} \\\\\n")
 
     tex = (
-        "\\begin{tabular*}{\\linewidth}{@{\\extracolsep{\\fill}} l r r r r r r r}\n"
+        "\\begin{tabular*}{\\linewidth}{@{\\extracolsep{\\fill}} l r r r r r r}\n"
         "\\toprule\n"
-        " & & \\multicolumn{2}{c}{FP32} & \\multicolumn{2}{c}{FP16} & & \\\\\n"
-        "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\n"
-        "Model & Params (M) & ms & FPS & ms & FPS & FP16 speedup & Rank@1 \\\\\n"
+        " & \\multicolumn{2}{c}{FP32} & \\multicolumn{2}{c}{FP16} & & \\\\\n"
+        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\n"
+        "Model & ms & FPS & ms & FPS & FP16 speedup & Rank@1 \\\\\n"
         "\\midrule\n"
         f"{body}"
         "\\bottomrule\n"

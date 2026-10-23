@@ -111,8 +111,19 @@ for idx, (arch, variant, title, baseline_rank1, base_color) in enumerate(PANELS)
     baseline_mask = mask & (comp["variant"] == variant) & (comp["prune_method"] == "None")
 
     baseline_row = comp[baseline_mask]
-    pruned_rows = comp[pruned_mask].copy()
-    pruned_rows = pruned_rows[pruned_rows["prune_method"].notna()]
+    # Historical variant labels conflate the Swin-B hybrid and baseline sources.
+    # Select actual experiment IDs from the full metrics, not the derived labels.
+    source_prefix = {
+        "Swin-T": "swin_tiny_baseline-",
+        "DeiT3-S": "deit3_small_baseline-",
+        "Swin-B": "swin_base_baseline-",
+        # The legacy filename used the no-adapter vimriwcl checkpoint.
+        "DeiT3-B": "deit3_base_lora-",
+    }[arch]
+    pruned_rows = full[
+        (full["precision"] == "FP32") & full["model"].str.startswith(source_prefix)
+    ].copy()
+    assert len(pruned_rows) == (4 if arch == "DeiT3-B" else 3)
 
     # Fixed display order (top to bottom): Original, Blocks, 10% heads, 25% heads, 50% heads
     # barh draws bottom-to-top, so reverse the order in the list
@@ -140,7 +151,7 @@ for idx, (arch, variant, title, baseline_rank1, base_color) in enumerate(PANELS)
         # Skip 50% heads (only present for DeiT3-B)
         if "50%" in pm:
             continue
-        entries.append((pm, float(row["rank_at_1"]), float(row["size_MB"])))
+        entries.append((pm, float(row["rank@1"]), float(row["size_MB"])))
     entries.sort(key=lambda e: _sort_key(e[0]))
 
     # Add baseline first (will appear at top after reversal by barh)

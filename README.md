@@ -47,3 +47,12 @@ print("TinyFace located at:", tinyface_root)
 
 Any training or evaluation script can now load the dataset root without hard-coding paths.
 
+## Generated Artifacts
+
+Keep model binaries, raw benchmark artifacts (including per-layer profile JSON),
+superseded measurements, caches, compressed archives, and LaTeX build/review outputs
+out of Git. Keep manuscript sources, figure assets, code, configurations, dataset
+split definitions, and compact result summaries and provenance used to verify the
+report. Full evidence audits require the local artifacts referenced by their
+manifests; those artifacts are not included in a source checkout.
+

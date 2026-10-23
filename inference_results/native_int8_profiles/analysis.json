@@ -1,0 +1,52 @@
+{
+  "interpretation": "The INT8 constraints add reformatting and break floating-point fusions. These observations support conversion overhead and lost fusion as explanations for the batch-1 slowdown; they do not isolate every causal contribution.",
+  "profiling_caveat": "Profiling adds per-layer timing overhead; profiled totals must not replace the separate unprofiled latency measurements. Logical layers include NoOp entries and do not equal GPU kernel launches.",
+  "compiled_graphs": {
+    "fp16_selected": {
+      "logical_layers": 113,
+      "layer_types": {
+        "Reformat": 1,
+        "CaskConvolution": 1,
+        "shape_call": 1,
+        "kgen": 62,
+        "gemm": 48
+      },
+      "inspector_source": "inference_results/calibrated_native_deit3_small_heads10/engine_inspector.json"
+    },
+    "required_int8": {
+      "logical_layers": 463,
+      "layer_types": {
+        "Reformat": 51,
+        "CaskConvolution": 49,
+        "shape_call": 1,
+        "kgen": 26,
+        "NoOp": 192,
+        "Shuffle": 36,
+        "Slice": 36,
+        "Scale": 24,
+        "CaskGemmMatrixMultiply": 24,
+        "CaskSoftMaxV2": 12,
+        "PointWiseV2": 12
+      },
+      "inspector_source": "inference_results/calibrated_native_deit3_small_heads10/required_int8/engine_inspector.json"
+    }
+  },
+  "profiles": {
+    "fp16": {
+      "profiled_layers": 112,
+      "profiled_mean_total_ms": 1.57918329,
+      "standalone_softmax_entries": 0
+    },
+    "int8": {
+      "profiled_layers": 463,
+      "profiled_mean_total_ms": 3.15859905,
+      "standalone_softmax_entries": 12
+    }
+  },
+  "evidence_sha256": {
+    "fp16_profile.json": "2be0c9f62887dd50924e4675fb787874465f2dc56560b8d236538f0eeb5ecd2f",
+    "fp16_profile.log.gz": "0115e1be4bbafa081143516a5274f616d19a3bece5186a4350fdafb2f601e356",
+    "int8_profile.json": "c33035ff513d4c303eb40fc6d9467d0426d90fa7b09042558b7abd81b779ae22",
+    "int8_profile.log.gz": "4949315c32ac8703661eb342e98bdf98b8f18d3ec14126c77d73447e9f6545a2"
+  }
+}
